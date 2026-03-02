@@ -26,7 +26,7 @@ $ npm install -g @hesed/mysql
 $ mq COMMAND
 running command...
 $ mq (--version)
-@hesed/mysql/0.1.0 darwin-arm64 node-v22.14.0
+@hesed/mysql/0.1.0 linux-x64 node-v20.20.0
 $ mq --help [COMMAND]
 USAGE
   $ mq COMMAND
@@ -53,16 +53,15 @@ Add a MySQL connection profile
 
 ```
 USAGE
-  $ mq mysql auth add [--json] [-d <value>] [--host <value>] [-p <value>] [-P <value>] [--profile <value>] [--ssl]
-    [-u <value>]
+  $ mq mysql auth add -d <value> --host <value> -p <value> -P <value> --profile <value> -u <value> [--json] [--ssl]
 
 FLAGS
-  -P, --port=<value>      MySQL port
-  -d, --database=<value>  Database name
-  -p, --password=<value>  Password
-  -u, --user=<value>      Username
-      --host=<value>      MySQL host
-      --profile=<value>   Profile name
+  -P, --port=<value>      (required) MySQL port
+  -d, --database=<value>  (required) Database name
+  -p, --password=<value>  (required) Password
+  -u, --user=<value>      (required) Username
+      --host=<value>      (required) MySQL host
+      --profile=<value>   (required) Profile name
       --[no-]ssl          Use SSL
 
 GLOBAL FLAGS
@@ -110,15 +109,14 @@ Update an existing MySQL connection profile
 
 ```
 USAGE
-  $ mq mysql auth update [--json] [-d <value>] [--host <value>] [-p <value>] [-P <value>] [--profile <value>] [--ssl]
-    [-u <value>]
+  $ mq mysql auth update -d <value> --host <value> -p <value> -P <value> -u <value> [--json] [--profile <value>] [--ssl]
 
 FLAGS
-  -P, --port=<value>      MySQL port
-  -d, --database=<value>  Database name
-  -p, --password=<value>  Password
-  -u, --user=<value>      Username
-      --host=<value>      MySQL host
+  -P, --port=<value>      (required) MySQL port
+  -d, --database=<value>  (required) Database name
+  -p, --password=<value>  (required) Password
+  -u, --user=<value>      (required) Username
+      --host=<value>      (required) MySQL host
       --profile=<value>   Profile name to update
       --[no-]ssl          Use SSL
 
