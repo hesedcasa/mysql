@@ -40,12 +40,12 @@ USAGE
 * [`mq mysql auth add`](#mq-mysql-auth-add)
 * [`mq mysql auth test`](#mq-mysql-auth-test)
 * [`mq mysql auth update`](#mq-mysql-auth-update)
-* [`mq mysql describe-table`](#mq-mysql-describe-table)
-* [`mq mysql explain-query QUERY`](#mq-mysql-explain-query-query)
 * [`mq mysql databases`](#mq-mysql-databases)
-* [`mq mysql tables`](#mq-mysql-tables)
+* [`mq mysql describe-table TABLE`](#mq-mysql-describe-table-table)
+* [`mq mysql explain-query QUERY`](#mq-mysql-explain-query-query)
+* [`mq mysql indexes TABLE`](#mq-mysql-indexes-table)
 * [`mq mysql query QUERY`](#mq-mysql-query-query)
-* [`mq mysql indexes`](#mq-mysql-indexes)
+* [`mq mysql tables`](#mq-mysql-tables)
 
 ## `mq mysql auth add`
 
@@ -134,27 +134,51 @@ EXAMPLES
 
 _See code: [src/commands/mysql/auth/update.ts](https://github.com/hesedcasa/mysql/blob/v0.1.0/src/commands/mysql/auth/update.ts)_
 
-## `mq mysql describe-table`
+## `mq mysql databases`
+
+List all databases accessible on the MySQL server
+
+```
+USAGE
+  $ mq mysql databases [--profile <value>]
+
+FLAGS
+  --profile=<value>  Database profile name from config
+
+DESCRIPTION
+  List all databases accessible on the MySQL server
+
+EXAMPLES
+  $ mq mysql databases
+
+  $ mq mysql databases --profile staging
+```
+
+_See code: [src/commands/mysql/databases.ts](https://github.com/hesedcasa/mysql/blob/v0.1.0/src/commands/mysql/databases.ts)_
+
+## `mq mysql describe-table TABLE`
 
 Describe the structure of a MySQL table
 
 ```
 USAGE
-  $ mq mysql describe-table -t <value> [--format table|json|toon] [--profile <value>]
+  $ mq mysql describe-table TABLE [--format table|json|toon] [--profile <value>]
+
+ARGUMENTS
+  TABLE  Table name to describe
 
 FLAGS
-  -t, --table=<value>    (required) Table name to describe
-      --format=<option>  [default: table] Output format
-                         <options: table|json|toon>
-      --profile=<value>  Database profile name from config
+  --format=<option>  [default: table] Output format
+                     <options: table|json|toon>
+  --profile=<value>  Database profile name from config
 
 DESCRIPTION
   Describe the structure of a MySQL table
 
 EXAMPLES
-  $ mq mysql describe-table --table users
+  $ mq mysql describe-table users
 
-  $ mq mysql describe-table --table orders --format json --profile prod
+  $ mq mysql describe-table orders --format json --profile prod
 ```
 
 _See code: [src/commands/mysql/describe-table.ts](https://github.com/hesedcasa/mysql/blob/v0.1.0/src/commands/mysql/describe-table.ts)_
@@ -186,49 +210,32 @@ EXAMPLES
 
 _See code: [src/commands/mysql/explain-query.ts](https://github.com/hesedcasa/mysql/blob/v0.1.0/src/commands/mysql/explain-query.ts)_
 
-## `mq mysql databases`
+## `mq mysql indexes TABLE`
 
-List all databases accessible on the MySQL server
-
-```
-USAGE
-  $ mq mysql databases [--profile <value>]
-
-FLAGS
-  --profile=<value>  Database profile name from config
-
-DESCRIPTION
-  List all databases accessible on the MySQL server
-
-EXAMPLES
-  $ mq mysql databases
-
-  $ mq mysql databases --profile staging
-```
-
-_See code: [src/commands/mysql/databases.ts](https://github.com/hesedcasa/mysql/blob/v0.1.0/src/commands/mysql/databases.ts)_
-
-## `mq mysql tables`
-
-List all tables in the current MySQL database
+Show indexes for a MySQL table
 
 ```
 USAGE
-  $ mq mysql tables [--profile <value>]
+  $ mq mysql indexes TABLE [--format table|json|toon] [--profile <value>]
+
+ARGUMENTS
+  TABLE  Table name to show indexes for
 
 FLAGS
+  --format=<option>  [default: table] Output format
+                     <options: table|json|toon>
   --profile=<value>  Database profile name from config
 
 DESCRIPTION
-  List all tables in the current MySQL database
+  Show indexes for a MySQL table
 
 EXAMPLES
-  $ mq mysql tables
+  $ mq mysql indexes users
 
-  $ mq mysql tables --profile local
+  $ mq mysql indexes orders --format json --profile prod
 ```
 
-_See code: [src/commands/mysql/tables.ts](https://github.com/hesedcasa/mysql/blob/v0.1.0/src/commands/mysql/tables.ts)_
+_See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.1.0/src/commands/mysql/indexes.ts)_
 
 ## `mq mysql query QUERY`
 
@@ -260,28 +267,25 @@ EXAMPLES
 
 _See code: [src/commands/mysql/query.ts](https://github.com/hesedcasa/mysql/blob/v0.1.0/src/commands/mysql/query.ts)_
 
-## `mq mysql indexes`
+## `mq mysql tables`
 
-Show indexes for a MySQL table
+List all tables in the current MySQL database
 
 ```
 USAGE
-  $ mq mysql indexes -t <value> [--format table|json|toon] [--profile <value>]
+  $ mq mysql tables [--profile <value>]
 
 FLAGS
-  -t, --table=<value>    (required) Table name to show indexes for
-      --format=<option>  [default: table] Output format
-                         <options: table|json|toon>
-      --profile=<value>  Database profile name from config
+  --profile=<value>  Database profile name from config
 
 DESCRIPTION
-  Show indexes for a MySQL table
+  List all tables in the current MySQL database
 
 EXAMPLES
-  $ mq mysql indexes --table users
+  $ mq mysql tables
 
-  $ mq mysql indexes --table orders --format json --profile prod
+  $ mq mysql tables --profile local
 ```
 
-_See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.1.0/src/commands/mysql/indexes.ts)_
+_See code: [src/commands/mysql/tables.ts](https://github.com/hesedcasa/mysql/blob/v0.1.0/src/commands/mysql/tables.ts)_
 <!-- commandsstop -->
