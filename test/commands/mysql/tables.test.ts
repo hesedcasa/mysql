@@ -3,67 +3,67 @@ import {expect} from 'chai'
 import esmock from 'esmock'
 import {type SinonStub, stub} from 'sinon'
 
-describe('mysql:show-indexes', () => {
-  let MySQLShowIndexes: any
-  let showIndexesStub: SinonStub
+describe('mysql:tables', () => {
+  let MySQLListTables: any
+  let listTablesStub: SinonStub
   let closeConnectionsStub: SinonStub
   let getMySQLConfigStub: SinonStub
   let setConfigDirStub: SinonStub
 
   const mockConfig = {defaultFormat: 'table', defaultProfile: 'local'}
-  const mockResult = {indexes: [], result: '┌──────────────┐\n│ PRIMARY (id) │\n└──────────────┘', success: true}
+  const mockResult = {result: 'Tables in database:\n  • users\n  • orders', success: true, tables: ['users', 'orders']}
 
   beforeEach(async () => {
-    showIndexesStub = stub().resolves(mockResult)
+    listTablesStub = stub().resolves(mockResult)
     closeConnectionsStub = stub().resolves()
     getMySQLConfigStub = stub().resolves(mockConfig)
     setConfigDirStub = stub()
 
-    const imported = await esmock('../../../src/commands/mysql/show-indexes.js', {
+    const imported = await esmock('../../../src/commands/mysql/tables.js', {
       '../../../src/mysql/index.js': {
         closeConnections: closeConnectionsStub,
         getMySQLConfig: getMySQLConfigStub,
+        listTables: listTablesStub,
         setConfigDir: setConfigDirStub,
-        showIndexes: showIndexesStub,
       },
     })
-    MySQLShowIndexes = imported.default
+    MySQLListTables = imported.default
   })
 
-  it('shows indexes using default profile and logs result', async () => {
-    const cmd = new MySQLShowIndexes(['--table', 'users'], {
+  it('lists tables using default profile and logs result', async () => {
+    const cmd = new MySQLListTables([], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
-    const logStub = stub(cmd, 'log')
+    const logJsonStub = stub(cmd, 'logJson')
 
     await cmd.run()
 
     expect(getMySQLConfigStub.calledOnce).to.be.true
-    expect(showIndexesStub.calledOnce).to.be.true
-    expect(showIndexesStub.firstCall.args).to.deep.equal(['local', 'users', 'table'])
+    expect(listTablesStub.calledOnce).to.be.true
+    expect(listTablesStub.firstCall.args[0]).to.equal('local')
     expect(closeConnectionsStub.calledOnce).to.be.true
-    expect(logStub.calledOnce).to.be.true
-    expect(logStub.firstCall.args[0]).to.equal(mockResult.result)
+    expect(logJsonStub.calledOnce).to.be.true
+    expect(logJsonStub.firstCall.args[0]).to.deep.equal(mockResult.tables)
   })
 
-  it('uses provided flags', async () => {
-    const cmd = new MySQLShowIndexes(['--table', 'orders', '--profile', 'staging', '--format', 'json'], {
+  it('uses provided --profile flag', async () => {
+    const cmd = new MySQLListTables(['--profile', 'prod'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
-    stub(cmd, 'log')
+    stub(cmd, 'logJson')
 
     await cmd.run()
 
     expect(getMySQLConfigStub.called).to.be.false
-    expect(showIndexesStub.firstCall.args).to.deep.equal(['staging', 'orders', 'json'])
+    expect(listTablesStub.firstCall.args[0]).to.equal('prod')
   })
 
-  it('throws error when show indexes fails', async () => {
-    showIndexesStub.resolves({error: "ERROR: Table 'mydb.nope' doesn't exist", success: false})
+  it('throws error when listing fails', async () => {
+    listTablesStub.resolves({error: 'ERROR: no database selected', success: false})
 
-    const cmd = new MySQLShowIndexes(['--table', 'nope'], {
+    const cmd = new MySQLListTables([], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)

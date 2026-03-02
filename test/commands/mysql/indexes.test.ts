@@ -3,67 +3,67 @@ import {expect} from 'chai'
 import esmock from 'esmock'
 import {type SinonStub, stub} from 'sinon'
 
-describe('mysql:list-databases', () => {
-  let MySQLListDatabases: any
-  let listDatabasesStub: SinonStub
+describe('mysql:indexes', () => {
+  let MySQLShowIndexes: any
+  let showIndexesStub: SinonStub
   let closeConnectionsStub: SinonStub
   let getMySQLConfigStub: SinonStub
   let setConfigDirStub: SinonStub
 
   const mockConfig = {defaultFormat: 'table', defaultProfile: 'local'}
-  const mockResult = {databases: ['mydb', 'testdb'], result: 'Databases:\n  • mydb\n  • testdb', success: true}
+  const mockResult = {indexes: [], result: '┌──────────────┐\n│ PRIMARY (id) │\n└──────────────┘', success: true}
 
   beforeEach(async () => {
-    listDatabasesStub = stub().resolves(mockResult)
+    showIndexesStub = stub().resolves(mockResult)
     closeConnectionsStub = stub().resolves()
     getMySQLConfigStub = stub().resolves(mockConfig)
     setConfigDirStub = stub()
 
-    const imported = await esmock('../../../src/commands/mysql/list-databases.js', {
+    const imported = await esmock('../../../src/commands/mysql/indexes.js', {
       '../../../src/mysql/index.js': {
         closeConnections: closeConnectionsStub,
         getMySQLConfig: getMySQLConfigStub,
-        listDatabases: listDatabasesStub,
         setConfigDir: setConfigDirStub,
+        showIndexes: showIndexesStub,
       },
     })
-    MySQLListDatabases = imported.default
+    MySQLShowIndexes = imported.default
   })
 
-  it('lists databases using default profile and logs result', async () => {
-    const cmd = new MySQLListDatabases([], {
+  it('shows indexes using default profile and logs result', async () => {
+    const cmd = new MySQLShowIndexes(['users'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
-    const logJsonStub = stub(cmd, 'logJson')
+    const logStub = stub(cmd, 'log')
 
     await cmd.run()
 
     expect(getMySQLConfigStub.calledOnce).to.be.true
-    expect(listDatabasesStub.calledOnce).to.be.true
-    expect(listDatabasesStub.firstCall.args[0]).to.equal('local')
+    expect(showIndexesStub.calledOnce).to.be.true
+    expect(showIndexesStub.firstCall.args).to.deep.equal(['local', 'users', 'table'])
     expect(closeConnectionsStub.calledOnce).to.be.true
-    expect(logJsonStub.calledOnce).to.be.true
-    expect(logJsonStub.firstCall.args[0]).to.deep.equal(mockResult.databases)
+    expect(logStub.calledOnce).to.be.true
+    expect(logStub.firstCall.args[0]).to.equal(mockResult.result)
   })
 
-  it('uses provided --profile flag', async () => {
-    const cmd = new MySQLListDatabases(['--profile', 'staging'], {
+  it('uses provided flags', async () => {
+    const cmd = new MySQLShowIndexes(['orders', '--profile', 'staging', '--format', 'json'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
-    stub(cmd, 'logJson')
+    stub(cmd, 'log')
 
     await cmd.run()
 
     expect(getMySQLConfigStub.called).to.be.false
-    expect(listDatabasesStub.firstCall.args[0]).to.equal('staging')
+    expect(showIndexesStub.firstCall.args).to.deep.equal(['staging', 'orders', 'json'])
   })
 
-  it('throws error when listing fails', async () => {
-    listDatabasesStub.resolves({error: 'ERROR: access denied', success: false})
+  it('throws error when show indexes fails', async () => {
+    showIndexesStub.resolves({error: "ERROR: Table 'mydb.nope' doesn't exist", success: false})
 
-    const cmd = new MySQLListDatabases([], {
+    const cmd = new MySQLShowIndexes(['nope'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
