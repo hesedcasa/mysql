@@ -36,10 +36,10 @@ src/
 ├── commands/mysql/      # Oclif CLI commands (namespace: mysql)
 │   ├── auth/            # auth add, auth test, auth update
 │   ├── query.ts         # Execute arbitrary SQL
-│   ├── list-databases.ts
-│   ├── list-tables.ts
+│   ├── databases.ts
+│   ├── tables.ts
 │   ├── describe-table.ts
-│   ├── show-indexes.ts
+│   ├── indexes.ts
 │   └── explain-query.ts
 ├── mysql/               # MySQL interaction layer
 │   ├── mysql-client.ts  # Singleton client + exported functions (setConfigDir, getMySQLConfig, executeQuery, etc.)
@@ -56,6 +56,7 @@ src/
 **1. Command Pattern:**
 
 Commands are thin Oclif wrappers that:
+
 1. Call `setConfigDir(this.config.configDir)` before any MySQL operation
 2. Resolve the profile: `flags.profile ?? (await getMySQLConfig()).defaultProfile`
 3. Call a function from `src/mysql/index.js`
@@ -70,7 +71,7 @@ Commands are thin Oclif wrappers that:
 
 - `checkBlacklist`: blocks operations in `blacklistedOperations` (e.g. `DROP DATABASE`)
 - `requiresConfirmation`: returns `requiresConfirmation: true` for destructive ops (DELETE, UPDATE, DROP, TRUNCATE, ALTER) unless `skipConfirmation=true`
-- `analyzeQuery`: produces warnings for missing WHERE, SELECT *, missing LIMIT
+- `analyzeQuery`: produces warnings for missing WHERE, SELECT \*, missing LIMIT
 - `applyDefaultLimit`: auto-appends `LIMIT 100` to SELECT queries without one
 
 **4. Result Types (`database.ts`):**
@@ -80,7 +81,7 @@ All MySQL functions return typed result objects with a `success: boolean` field 
 ## Adding a New Command
 
 1. Create `src/commands/mysql/<name>.ts` extending `Command`
-2. Follow the pattern from `src/commands/mysql/list-tables.ts`:
+2. Follow the pattern from `src/commands/mysql/tables.ts`:
 
 ```typescript
 import {Command, Flags} from '@oclif/core'
@@ -148,7 +149,7 @@ const imported = await esmock('../../../src/commands/mysql/query.js', {
   '../../../src/mysql/index.js': {
     closeConnections: closeConnectionsStub,
     executeQuery: executeQueryStub,
-    getMySQLConfig: getMySQLConfigStub,  // stub().resolves(mockConfig)
+    getMySQLConfig: getMySQLConfigStub, // stub().resolves(mockConfig)
     setConfigDir: setConfigDirStub,
   },
 })

@@ -31,7 +31,7 @@ describe('mysql:describe-table', () => {
   })
 
   it('describes table using default profile and logs result', async () => {
-    const cmd = new MySQLDescribeTable(['--table', 'users'], {
+    const cmd = new MySQLDescribeTable(['users'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
@@ -48,7 +48,7 @@ describe('mysql:describe-table', () => {
   })
 
   it('uses provided flags', async () => {
-    const cmd = new MySQLDescribeTable(['--table', 'orders', '--profile', 'prod', '--format', 'json'], {
+    const cmd = new MySQLDescribeTable(['orders', '--profile', 'prod', '--format', 'json'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
@@ -63,7 +63,7 @@ describe('mysql:describe-table', () => {
   it('throws error when describe fails', async () => {
     describeTableStub.resolves({error: "ERROR: Table 'mydb.nope' doesn't exist", success: false})
 
-    const cmd = new MySQLDescribeTable(['--table', 'nope'], {
+    const cmd = new MySQLDescribeTable(['nope'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
