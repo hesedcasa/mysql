@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**mysql** is an Oclif-based CLI tool for interacting with the Bitbucket Cloud REST API v2. It provides comprehensive access to Bitbucket functionality including repositories, pull requests, pipelines, and workspaces.
+**mq** is an Oclif-based CLI tool (`bin: mq`) for interacting with MySQL databases. It supports multi-profile connection management, safe query execution, and multiple output formats.
 
 ## Development Commands
 
@@ -31,196 +31,164 @@ npm run find-deadcode
 
 ## Architecture
 
-The project follows a layered architecture with clear separation of concerns:
-
 ```
 src/
-├── commands/mysql/      # Oclif CLI commands, all namespaced under mysql/
-│   ├── auth/        # auth add, test, update
-│   ├── pipeline/    # pipeline get, list, trigger
-│   ├── pr/          # pr approve, create, decline, get, list, merge, unapprove, update
-│   ├── repo/        # repo create, delete, get, list
-│   └── workspace/   # workspace get, list
-├── bitbucket/       # Bitbucket REST API layer
-│   ├── bitbucket-api.ts     # BitbucketApi class with core API methods
-│   └── bitbucket-client.ts  # Wrapper functions with singleton pattern
-├── config.ts        # Configuration management (auth config)
-└── format.ts        # Output formatting (TOON format)
+├── commands/mysql/      # Oclif CLI commands (namespace: mysql)
+│   ├── auth/            # auth add, auth test, auth update
+│   ├── query.ts         # Execute arbitrary SQL
+│   ├── list-databases.ts
+│   ├── list-tables.ts
+│   ├── describe-table.ts
+│   ├── show-indexes.ts
+│   └── explain-query.ts
+├── mysql/               # MySQL interaction layer
+│   ├── mysql-client.ts  # Singleton client + exported functions (setConfigDir, getMySQLConfig, executeQuery, etc.)
+│   ├── mysql-utils.ts   # MySQLUtil class — connection pooling, formatting, safety enforcement
+│   ├── config-loader.ts # MySQLConfig type + getMySQLConnectionOptions()
+│   ├── database.ts      # Result interfaces (QueryResult, DatabaseListResult, etc.)
+│   ├── query-validator.ts # Safety checks: blacklist, confirmation, auto-LIMIT, query analysis
+│   └── index.ts         # Re-exports from mysql-client.ts and database.ts
+└── config.ts            # readConfig(), DatabaseProfile, MySQLJsonConfig interfaces
 ```
 
 ### Key Architectural Patterns
 
-**1. Three-Tier Command Pattern:**
+**1. Command Pattern:**
 
-- **Commands** (`src/commands/mysql/`) - Thin Oclif command wrappers that parse args/flags
-- **Client Layer** (`bitbucket-client.ts`) - Functional wrappers with singleton pattern
-- **API Layer** (`bitbucket-api.ts`) - Core API class using native `fetch` for Bitbucket REST API v2
+Commands are thin Oclif wrappers that:
+1. Call `setConfigDir(this.config.configDir)` before any MySQL operation
+2. Resolve the profile: `flags.profile ?? (await getMySQLConfig()).defaultProfile`
+3. Call a function from `src/mysql/index.js`
+4. Call `await closeConnections()` for cleanup
+5. Output with `this.log(result.result)`, `this.logJson(...)`, or `this.error(...)`
 
-**2. ApiResult Pattern:**
-All API functions return `ApiResult` objects (non-generic):
+**2. Singleton Client (`mysql-client.ts`):**
 
-```typescript
-interface ApiResult {
-  data?: unknown
-  error?: unknown
-  success: boolean
-}
-```
+`initMySQL()` lazily creates a `MySQLUtil` instance using the JSON config loaded from `cachedConfigDir`. `getMySQLConfig()` returns the cached `MySQLConfig`. `closeConnections()` tears down all connections and resets the singleton.
 
-**3. Singleton Client Pattern:**
-`bitbucket-client.ts` maintains a singleton instance of the `BitbucketApi` class. Commands should call `clearClients()` after use for cleanup.
+**3. Safety System (`query-validator.ts` + `MySQLUtil`):**
+
+- `checkBlacklist`: blocks operations in `blacklistedOperations` (e.g. `DROP DATABASE`)
+- `requiresConfirmation`: returns `requiresConfirmation: true` for destructive ops (DELETE, UPDATE, DROP, TRUNCATE, ALTER) unless `skipConfirmation=true`
+- `analyzeQuery`: produces warnings for missing WHERE, SELECT *, missing LIMIT
+- `applyDefaultLimit`: auto-appends `LIMIT 100` to SELECT queries without one
+
+**4. Result Types (`database.ts`):**
+
+All MySQL functions return typed result objects with a `success: boolean` field and optional `error` string. Commands check `result.success` to decide whether to log or error.
 
 ## Adding a New Command
 
-1. Create command file in `src/commands/mysql/<category>/<name>.ts`
-2. Extend `Command` from `@oclif/core`
-3. Define static `args`, `flags`, `description`, and `examples`
-4. In `run()` method:
-   - Parse args/flags
-   - Read config with `readConfig(this.config.configDir, this.log)`
-   - Call appropriate client function from `bitbucket-client.ts`
-   - Call `clearClients()` for cleanup
-   - Output with `this.logJson(result)` or `this.log(formatAsToon(result))`
-
-Example pattern from `src/commands/mysql/repo/get.ts`:
+1. Create `src/commands/mysql/<name>.ts` extending `Command`
+2. Follow the pattern from `src/commands/mysql/list-tables.ts`:
 
 ```typescript
-import {Args, Command, Flags} from '@oclif/core'
+import {Command, Flags} from '@oclif/core'
+import {closeConnections, getMySQLConfig, listTables, setConfigDir} from '../../mysql/index.js'
 
-import {clearClients, getRepository} from '../../../bitbucket/bitbucket-client.js'
-import {readConfig} from '../../../config.js'
-import {formatAsToon} from '../../../format.js'
-
-export default class RepoGet extends Command {
-  /* eslint-disable perfectionist/sort-objects */
-  static override args = {
-    workspace: Args.string({description: 'Workspace slug or UUID', required: true}),
-    repoSlug: Args.string({description: 'Repository slug', required: true}),
-  }
-  /* eslint-enable perfectionist/sort-objects */
-  static override description = 'Get details of a specific repository'
-  static override examples = ['<%= config.bin %> <%= command.id %> my-workspace my-repo']
+export default class MySQLTables extends Command {
   static override flags = {
-    toon: Flags.boolean({description: 'Format output as toon', required: false}),
+    profile: Flags.string({description: 'Database profile name from config', required: false}),
   }
 
   public async run(): Promise<void> {
-    const {args, flags} = await this.parse(RepoGet)
-    const config = await readConfig(this.config.configDir, this.log.bind(this))
-    if (!config) {
-      return
+    const {flags} = await this.parse(MySQLTables)
+    setConfigDir(this.config.configDir)
+    let profile: string
+    try {
+      profile = flags.profile ?? (await getMySQLConfig()).defaultProfile
+    } catch (error: unknown) {
+      this.error(error instanceof Error ? error.message : String(error))
     }
-
-    const result = await getRepository(config.auth, args.workspace, args.repoSlug)
-    clearClients()
-
-    if (flags.toon) {
-      this.log(formatAsToon(result))
+    const result = await listTables(profile)
+    await closeConnections()
+    if (result.success) {
+      this.logJson(result.tables)
     } else {
-      this.logJson(result)
+      this.error(result.error ?? 'Failed')
     }
   }
 }
 ```
 
-## Adding New API Functions
-
-1. Add method to `BitbucketApi` class in `bitbucket-api.ts`
-2. Export wrapper function in `bitbucket-client.ts` with `initBitbucket` pattern
-3. Use `ApiResult` return type for consistent error handling
+3. Add the corresponding function to `MySQLUtil` in `mysql-utils.ts`, export it through `mysql-client.ts` and `mysql/index.ts`
 
 ## Configuration
 
-Authentication config is stored in JSON at `~/.config/mysql/mysql-config.json` (platform-dependent):
+Stored at `~/.config/mysql/mysql-config.json` (multi-profile format):
 
 ```json
 {
-  "auth": {
-    "email": "user@example.com",
-    "apiToken": "token"
+  "defaultProfile": "local",
+  "profiles": {
+    "local": {
+      "host": "localhost",
+      "port": 3306,
+      "user": "root",
+      "password": "secret",
+      "database": "mydb",
+      "ssl": false
+    }
   }
 }
 ```
 
+Auth commands (`mq mysql auth add/test/update`) manage this file. `auth add` creates the file with mode `0o600`.
+
 ## Testing
 
-- Tests mirror source structure in `test/` directory (e.g. `test/commands/mysql/repo/get.test.ts`)
-- Mocha + Chai for testing
-- `esmock` for module mocking, `sinon` for stub/spy/mock objects
-- Tests use `ts-node` for TypeScript execution (see `.mocharc.json`)
+- Tests mirror source structure in `test/` (e.g. `test/commands/mysql/query.test.ts`)
+- Mocha + Chai, `esmock` for module mocking, `sinon` for stubs
 - 60-second timeout for all tests
 
-Two distinct testing patterns depending on layer:
-
-**Command tests** (`test/commands/mysql/`): Use `esmock` to mock all three dependencies, instantiate the command class directly, and stub `logJson`/`log` on the instance:
+**Command tests** — use `esmock` to mock `src/mysql/index.js`, instantiate the command directly, stub `log`/`logJson` on the instance:
 
 ```typescript
-const imported = await esmock('../../../../src/commands/mysql/repo/get.js', {
-  '../../../../src/bitbucket/bitbucket-client.js': {clearClients: clearClientsStub, getRepository: getRepositoryStub},
-  '../../../../src/config.js': {readConfig: readConfigStub},
-  '../../../../src/format.js': {formatAsToon: formatAsToonStub},
+const imported = await esmock('../../../src/commands/mysql/query.js', {
+  '../../../src/mysql/index.js': {
+    closeConnections: closeConnectionsStub,
+    executeQuery: executeQueryStub,
+    getMySQLConfig: getMySQLConfigStub,  // stub().resolves(mockConfig)
+    setConfigDir: setConfigDirStub,
+  },
 })
-const RepoGet = imported.default
-const cmd = new RepoGet(['my-ws', 'my-repo'], {
+const MySQLQuery = imported.default
+const cmd = new MySQLQuery(['SELECT 1'], {
   root: process.cwd(),
   runHook: stub().resolves({failures: [], successes: []}),
 } as any)
-stub(cmd, 'logJson')
+stub(cmd, 'log')
 await cmd.run()
 ```
 
-**API layer tests** (`test/bitbucket/bitbucket-api.test.ts`): Stub `globalThis.fetch` directly:
+**MySQL layer tests** (`test/mysql/mysql-utils.test.ts`) — stub `mysql.createConnection` directly.
+
+**Auth command tests** — mock `@inquirer/prompts` input function in `beforeEach` to avoid blocking on stdin:
 
 ```typescript
-fetchStub = stub(globalThis, 'fetch')
-fetchStub.resolves(new Response(JSON.stringify({...}), {status: 200}))
-// restore in afterEach: fetchStub.restore()
+const mockInput = stub().callsFake(async ({message}: {message: string}) => {
+  if (message.includes('Profile')) return 'local'
+  if (message.includes('host')) return 'localhost'
+  // ...
+})
 ```
-
-## Output Formatting
-
-- Default: JSON via `this.logJson()`
-- TOON format: Custom token-oriented format via `formatAsToon()` (using `@toon-format/toon`)
-- Use `--toon` flag to enable TOON output
-
-## Dependencies
-
-- **@oclif/core** - CLI framework
-- **@toon-format/toon** - TOON output format
-- **@inquirer/prompts** - Interactive prompts
-- **fs-extra** - File system utilities
 
 ## Important Notes
 
-- All command files use ES modules (`.js` extensions in imports)
-- Uses native `fetch` (Node.js 18+) for Bitbucket REST API calls — no external HTTP library needed
-- The Bitbucket REST API base URL is always hardcoded to `https://api.bitbucket.org/2.0`; the `host` field in config is not used for API requests
-- Functions with more than 3 parameters require `// eslint-disable-next-line max-params` above the function signature
-- JSDoc `@param` for inline object parameters must list each property individually with dot-notation (e.g. `@param options.description`) to satisfy the JSDoc linter
-- The `static override args` block in commands must be wrapped with `/* eslint-disable/enable perfectionist/sort-objects */` because Oclif processes args positionally (declaration order = parse order), preventing alphabetical sorting
-- Pre-commit hook runs format and dead code detection
-- Uses `shx` for cross-platform shell commands
+- All imports use `.js` extensions (ES modules)
+- The `static override args` block must be wrapped with `/* eslint-disable/enable perfectionist/sort-objects */` — Oclif parses args positionally
+- Functions with more than 3 parameters require `// eslint-disable-next-line max-params` above the signature
+- JSDoc `@param` for inline objects must use dot-notation per property (e.g. `@param options.description`)
+- Pre-commit hook runs `npm run format && npm run find-deadcode`
 - Node.js >=18.0.0 required
-- Published as npm package `mysql`
 
 ## Commit Message Convention
 
-**Always use Conventional Commits format** for all commit messages and PR titles:
+**Always use Conventional Commits format:**
 
-- `feat:` - New features or capabilities
-- `fix:` - Bug fixes
-- `docs:` - Documentation changes only
-- `refactor:` - Code refactoring without changing functionality
-- `test:` - Adding or modifying tests
-- `chore:` - Maintenance tasks, dependency updates, build configuration
-
-**Examples:**
-
-```
-feat: add list-repos command for workspaces
-fix: handle connection timeout errors gracefully
-docs: update configuration examples in README
-refactor: extract API formatting into separate module
-test: add integration tests for Bitbucket operations
-chore: update dependencies to latest versions
-```
+- `feat:` — new features
+- `fix:` — bug fixes
+- `refactor:` — refactoring without behavior change
+- `test:` — tests only
+- `docs:` — documentation only
+- `chore:` — maintenance, deps, build config
