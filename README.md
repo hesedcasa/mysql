@@ -26,7 +26,7 @@ $ npm install -g @hesed/mysql
 $ mq COMMAND
 running command...
 $ mq (--version)
-@hesed/mysql/0.2.0 linux-x64 node-v20.20.0
+@hesed/mysql/0.2.1 linux-x64 node-v20.20.0
 $ mq --help [COMMAND]
 USAGE
   $ mq COMMAND
@@ -76,7 +76,7 @@ EXAMPLES
   $ mq mysql auth add --no-ssl
 ```
 
-_See code: [src/commands/mysql/auth/add.ts](https://github.com/hesedcasa/mysql/blob/v0.2.0/src/commands/mysql/auth/add.ts)_
+_See code: [src/commands/mysql/auth/add.ts](https://github.com/hesedcasa/mysql/blob/v0.2.1/src/commands/mysql/auth/add.ts)_
 
 ## `mq mysql auth test`
 
@@ -101,7 +101,7 @@ EXAMPLES
   $ mq mysql auth test --profile staging
 ```
 
-_See code: [src/commands/mysql/auth/test.ts](https://github.com/hesedcasa/mysql/blob/v0.2.0/src/commands/mysql/auth/test.ts)_
+_See code: [src/commands/mysql/auth/test.ts](https://github.com/hesedcasa/mysql/blob/v0.2.1/src/commands/mysql/auth/test.ts)_
 
 ## `mq mysql auth update`
 
@@ -132,7 +132,7 @@ EXAMPLES
   $ mq mysql auth update --profile staging
 ```
 
-_See code: [src/commands/mysql/auth/update.ts](https://github.com/hesedcasa/mysql/blob/v0.2.0/src/commands/mysql/auth/update.ts)_
+_See code: [src/commands/mysql/auth/update.ts](https://github.com/hesedcasa/mysql/blob/v0.2.1/src/commands/mysql/auth/update.ts)_
 
 ## `mq mysql databases`
 
@@ -154,7 +154,7 @@ EXAMPLES
   $ mq mysql databases --profile staging
 ```
 
-_See code: [src/commands/mysql/databases.ts](https://github.com/hesedcasa/mysql/blob/v0.2.0/src/commands/mysql/databases.ts)_
+_See code: [src/commands/mysql/databases.ts](https://github.com/hesedcasa/mysql/blob/v0.2.1/src/commands/mysql/databases.ts)_
 
 ## `mq mysql describe-table TABLE`
 
@@ -181,7 +181,7 @@ EXAMPLES
   $ mq mysql describe-table orders --format json --profile prod
 ```
 
-_See code: [src/commands/mysql/describe-table.ts](https://github.com/hesedcasa/mysql/blob/v0.2.0/src/commands/mysql/describe-table.ts)_
+_See code: [src/commands/mysql/describe-table.ts](https://github.com/hesedcasa/mysql/blob/v0.2.1/src/commands/mysql/describe-table.ts)_
 
 ## `mq mysql explain-query QUERY`
 
@@ -208,7 +208,7 @@ EXAMPLES
   $ mq mysql explain-query "SELECT * FROM orders JOIN users ON orders.user_id = users.id" --format json
 ```
 
-_See code: [src/commands/mysql/explain-query.ts](https://github.com/hesedcasa/mysql/blob/v0.2.0/src/commands/mysql/explain-query.ts)_
+_See code: [src/commands/mysql/explain-query.ts](https://github.com/hesedcasa/mysql/blob/v0.2.1/src/commands/mysql/explain-query.ts)_
 
 ## `mq mysql indexes TABLE`
 
@@ -235,7 +235,7 @@ EXAMPLES
   $ mq mysql indexes orders --format json --profile prod
 ```
 
-_See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.2.0/src/commands/mysql/indexes.ts)_
+_See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.2.1/src/commands/mysql/indexes.ts)_
 
 ## `mq mysql query QUERY`
 
@@ -265,7 +265,7 @@ EXAMPLES
   $ mq mysql query "DELETE FROM sessions" --profile prod --skip-confirmation
 ```
 
-_See code: [src/commands/mysql/query.ts](https://github.com/hesedcasa/mysql/blob/v0.2.0/src/commands/mysql/query.ts)_
+_See code: [src/commands/mysql/query.ts](https://github.com/hesedcasa/mysql/blob/v0.2.1/src/commands/mysql/query.ts)_
 
 ## `mq mysql tables`
 
@@ -287,5 +287,5 @@ EXAMPLES
   $ mq mysql tables --profile local
 ```
 
-_See code: [src/commands/mysql/tables.ts](https://github.com/hesedcasa/mysql/blob/v0.2.0/src/commands/mysql/tables.ts)_
+_See code: [src/commands/mysql/tables.ts](https://github.com/hesedcasa/mysql/blob/v0.2.1/src/commands/mysql/tables.ts)_
 <!-- commandsstop -->
