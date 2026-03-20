@@ -6,7 +6,7 @@ import {type SinonStub, stub} from 'sinon'
 describe('mysql-utils: MySQLUtil', () => {
   let MySQLUtil: any
   let createConnectionStub: SinonStub
-  let mockConnection: {end: SinonStub; query: SinonStub}
+  let mockConnection: {end: SinonStub; ping: SinonStub; query: SinonStub}
 
   const mockConfig = {
     defaultFormat: 'table' as const,
@@ -24,6 +24,7 @@ describe('mysql-utils: MySQLUtil', () => {
   beforeEach(async () => {
     mockConnection = {
       end: stub().resolves(),
+      ping: stub().resolves(),
       query: stub(),
     }
     createConnectionStub = stub().resolves(mockConnection)

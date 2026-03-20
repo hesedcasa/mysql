@@ -25,20 +25,20 @@ import {analyzeQuery, applyDefaultLimit, checkBlacklist, getQueryType, requiresC
  */
 export class MySQLUtil implements DatabaseUtil {
   private config: MySQLConfig
-  private connectionPool: Map<string, Connection>
+  private connections: Map<string, Promise<Connection>>
 
   constructor(config: MySQLConfig) {
     this.config = config
-    this.connectionPool = new Map()
+    this.connections = new Map()
   }
 
   /**
    * Close all connections
    */
   async closeAll(): Promise<void> {
-    await Promise.all([...this.connectionPool.values()].map((conn) => conn.end()))
-
-    this.connectionPool.clear()
+    const entries = [...this.connections.values()]
+    this.connections.clear()
+    await Promise.allSettled(entries.map(async (connPromise) => (await connPromise).end()))
   }
 
   /**
@@ -425,14 +425,25 @@ export class MySQLUtil implements DatabaseUtil {
    * Get or create MySQL connection for a profile
    */
   private async getConnection(profileName: string): Promise<Connection> {
-    if (this.connectionPool.has(profileName)) {
-      return this.connectionPool.get(profileName)!
+    const existing = this.connections.get(profileName)
+    if (existing) {
+      try {
+        const conn = await existing
+        await conn.ping()
+        return conn
+      } catch {
+        this.connections.delete(profileName)
+      }
     }
 
-    const options = getMySQLConnectionOptions(this.config, profileName)
-    const connection = await mysql.createConnection(options)
-    this.connectionPool.set(profileName, connection)
+    const connPromise = mysql.createConnection(getMySQLConnectionOptions(this.config, profileName))
+    this.connections.set(profileName, connPromise)
 
-    return connection
+    try {
+      return await connPromise
+    } catch (error) {
+      this.connections.delete(profileName)
+      throw error
+    }
   }
 }
