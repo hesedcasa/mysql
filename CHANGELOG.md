@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/hesedcasa/mysql/compare/v0.2.1...v0.2.2) (2026-03-21)
+
+
+### 🛠️ Fixes
+
+* improve MySQL connection reliability and safety ([#10](https://github.com/hesedcasa/mysql/issues/10)) ([a20c3ff](https://github.com/hesedcasa/mysql/commit/a20c3ff783d39f56f58b3d5b286e7660220fbd01))
+
 ## [0.2.1](https://github.com/hesedcasa/mysql/compare/v0.2.0...v0.2.1) (2026-03-04)
 
 
