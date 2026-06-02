@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/hesedcasa/mysql/compare/v0.2.2...v0.3.0) (2026-06-02)
+
+
+### 🎉 Features
+
+* add @hesed/plugin-lib and missing auth commands (list, delete, profile) ([#44](https://github.com/hesedcasa/mysql/issues/44)) ([0d192eb](https://github.com/hesedcasa/mysql/commit/0d192ebc6814860c510c6b9b7d6d57d4d3c0f4ed))
+
 ## [0.2.2](https://github.com/hesedcasa/mysql/compare/v0.2.1...v0.2.2) (2026-03-21)
 
 
