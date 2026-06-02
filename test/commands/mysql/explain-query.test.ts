@@ -37,7 +37,11 @@ describe('mysql:explain-query', () => {
     await cmd.run()
 
     expect(explainQueryStub.calledOnce).to.be.true
-    expect(explainQueryStub.firstCall.args.slice(1)).to.deep.equal(['SELECT * FROM users WHERE id = 1', undefined, 'table'])
+    expect(explainQueryStub.firstCall.args.slice(1)).to.deep.equal([
+      'SELECT * FROM users WHERE id = 1',
+      undefined,
+      'table',
+    ])
     expect(closeConnectionsStub.calledOnce).to.be.true
     expect(logStub.calledOnce).to.be.true
     expect(logStub.firstCall.args[0]).to.equal(mockResult.result)

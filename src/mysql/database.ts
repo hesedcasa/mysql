@@ -1,11 +1,3 @@
-/**
- * Database abstraction interface
- * Defines the contract for the MySQL utility implementation
- */
-
-/**
- * Query execution result for SELECT/SHOW/DESCRIBE/EXPLAIN queries
- */
 export interface QueryResult {
   error?: string
   message?: string
@@ -14,9 +6,6 @@ export interface QueryResult {
   success: boolean
 }
 
-/**
- * Database list result
- */
 export interface DatabaseListResult {
   databases?: string[]
   error?: string
@@ -24,9 +13,6 @@ export interface DatabaseListResult {
   success: boolean
 }
 
-/**
- * Table list result
- */
 export interface TableListResult {
   error?: string
   result?: string
@@ -34,9 +20,6 @@ export interface TableListResult {
   tables?: string[]
 }
 
-/**
- * Table structure result
- */
 export interface TableStructureResult {
   error?: string
   result?: string
@@ -44,9 +27,6 @@ export interface TableStructureResult {
   success: boolean
 }
 
-/**
- * Index information result
- */
 export interface IndexResult {
   error?: string
   indexes?: Record<string, unknown>[]
@@ -54,9 +34,6 @@ export interface IndexResult {
   success: boolean
 }
 
-/**
- * Query plan result
- */
 export interface ExplainResult {
   error?: string
   plan?: Record<string, unknown>[]
@@ -64,9 +41,6 @@ export interface ExplainResult {
   success: boolean
 }
 
-/**
- * Connection test result
- */
 export interface ConnectionTestResult {
   database?: string
   error?: string
@@ -75,14 +49,8 @@ export interface ConnectionTestResult {
   version?: string
 }
 
-/**
- * Output format type
- */
 export type OutputFormat = 'csv' | 'json' | 'table' | 'toon'
 
-/**
- * Database utility interface
- */
 export interface DatabaseUtil {
   closeAll(): Promise<void>
   describeTable(profileName: string, table: string, format?: OutputFormat): Promise<TableStructureResult>

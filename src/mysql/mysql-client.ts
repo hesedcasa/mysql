@@ -19,9 +19,12 @@ import {MySQLUtil} from './mysql-utils.js'
 let mysqlUtil: MySQLUtil | null = null
 let cachedConfig: MySQLConfig | null = null
 
-/**
- * Initialize (or return cached) MySQLUtil
- */
+const DEFAULT_SAFETY_CONFIG = {
+  blacklistedOperations: ['DROP DATABASE'],
+  defaultLimit: 100,
+  requireConfirmationFor: ['DELETE', 'UPDATE', 'DROP', 'TRUNCATE', 'ALTER'],
+}
+
 async function initMySQL(config: Config): Promise<MySQLUtil> {
   if (mysqlUtil) return mysqlUtil
 
@@ -41,11 +44,7 @@ async function initMySQL(config: Config): Promise<MySQLUtil> {
     defaultFormat: 'table',
     defaultProfile,
     profiles,
-    safety: {
-      blacklistedOperations: ['DROP DATABASE'],
-      defaultLimit: 100,
-      requireConfirmationFor: ['DELETE', 'UPDATE', 'DROP', 'TRUNCATE', 'ALTER'],
-    },
+    safety: DEFAULT_SAFETY_CONFIG,
   }
 
   mysqlUtil = new MySQLUtil(cachedConfig)
@@ -115,11 +114,7 @@ export async function testDirectConnection(profile: DatabaseProfile): Promise<Co
     defaultFormat: 'table',
     defaultProfile: 'default',
     profiles: {default: profile},
-    safety: {
-      blacklistedOperations: ['DROP DATABASE'],
-      defaultLimit: 100,
-      requireConfirmationFor: ['DELETE', 'UPDATE', 'DROP', 'TRUNCATE', 'ALTER'],
-    },
+    safety: DEFAULT_SAFETY_CONFIG,
   }
 
   const util = new MySQLUtil(testConfig)
