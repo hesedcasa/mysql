@@ -26,7 +26,7 @@ $ npm install -g @hesed/mysql
 $ mq COMMAND
 running command...
 $ mq (--version)
-@hesed/mysql/0.2.2 linux-x64 node-v20.20.1
+@hesed/mysql/0.3.0 linux-x64 node-v22.22.3
 $ mq --help [COMMAND]
 USAGE
   $ mq COMMAND
@@ -38,6 +38,9 @@ USAGE
 
 <!-- commands -->
 * [`mq mysql auth add`](#mq-mysql-auth-add)
+* [`mq mysql auth delete`](#mq-mysql-auth-delete)
+* [`mq mysql auth list`](#mq-mysql-auth-list)
+* [`mq mysql auth profile`](#mq-mysql-auth-profile)
 * [`mq mysql auth test`](#mq-mysql-auth-test)
 * [`mq mysql auth update`](#mq-mysql-auth-update)
 * [`mq mysql databases`](#mq-mysql-databases)
@@ -49,90 +52,162 @@ USAGE
 
 ## `mq mysql auth add`
 
-Add a MySQL connection profile
+Add MySQL authentication
 
 ```
 USAGE
-  $ mq mysql auth add -d <value> --host <value> -p <value> -P <value> --profile <value> -u <value> [--json] [--ssl]
+  $ mq mysql auth add -p <value> --host <value> --port <value> -u <value> --password <value> -d <value> --ssl
+    [--json]
 
 FLAGS
-  -P, --port=<value>      (required) MySQL port
   -d, --database=<value>  (required) Database name
-  -p, --password=<value>  (required) Password
+  -p, --profile=<value>   (required) Profile name
   -u, --user=<value>      (required) Username
       --host=<value>      (required) MySQL host
-      --profile=<value>   (required) Profile name
-      --[no-]ssl          Use SSL
+      --password=<value>  (required) Password
+      --port=<value>      (required) MySQL port
+      --ssl               (required) Use SSL
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Add a MySQL connection profile
+  Add MySQL authentication
 
 EXAMPLES
   $ mq mysql auth add
 
-  $ mq mysql auth add --no-ssl
+  $ mq mysql auth add -p prod
 ```
 
-_See code: [src/commands/mysql/auth/add.ts](https://github.com/hesedcasa/mysql/blob/v0.2.2/src/commands/mysql/auth/add.ts)_
+_See code: [src/commands/mysql/auth/add.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/auth/add.ts)_
 
-## `mq mysql auth test`
+## `mq mysql auth delete`
 
-Test MySQL database connection
+Delete an authentication profile
 
 ```
 USAGE
-  $ mq mysql auth test [--json] [--profile <value>]
+  $ mq mysql auth delete [--json] [-p <value>]
 
 FLAGS
-  --profile=<value>  Profile name to test
+  -p, --profile=<value>  Profile to delete
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Test MySQL database connection
+  Delete an authentication profile
+
+EXAMPLES
+  $ mq mysql auth delete
+
+  $ mq mysql auth delete -p prod
+```
+
+_See code: [src/commands/mysql/auth/delete.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/auth/delete.ts)_
+
+## `mq mysql auth list`
+
+List authentication profiles
+
+```
+USAGE
+  $ mq mysql auth list [--json]
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List authentication profiles
+
+EXAMPLES
+  $ mq mysql auth list
+```
+
+_See code: [src/commands/mysql/auth/list.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/auth/list.ts)_
+
+## `mq mysql auth profile`
+
+Set or show the default authentication profile
+
+```
+USAGE
+  $ mq mysql auth profile [--json] [--default <value>]
+
+FLAGS
+  --default=<value>  Profile to set as default
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Set or show the default authentication profile
+
+EXAMPLES
+  $ mq mysql auth profile
+
+  $ mq mysql auth profile --default test
+```
+
+_See code: [src/commands/mysql/auth/profile.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/auth/profile.ts)_
+
+## `mq mysql auth test`
+
+Test authentication and connection
+
+```
+USAGE
+  $ mq mysql auth test [--json] [-p <value>]
+
+FLAGS
+  -p, --profile=<value>  Authentication profile name
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Test authentication and connection
 
 EXAMPLES
   $ mq mysql auth test
 
-  $ mq mysql auth test --profile staging
+  $ mq mysql auth test -p prod
 ```
 
-_See code: [src/commands/mysql/auth/test.ts](https://github.com/hesedcasa/mysql/blob/v0.2.2/src/commands/mysql/auth/test.ts)_
+_See code: [src/commands/mysql/auth/test.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/auth/test.ts)_
 
 ## `mq mysql auth update`
 
-Update an existing MySQL connection profile
+Update MySQL authentication
 
 ```
 USAGE
-  $ mq mysql auth update -d <value> --host <value> -p <value> -P <value> -u <value> [--json] [--profile <value>] [--ssl]
+  $ mq mysql auth update -p <value> --host <value> --port <value> -u <value> --password <value> -d <value> --ssl
+    [--json]
 
 FLAGS
-  -P, --port=<value>      (required) MySQL port
   -d, --database=<value>  (required) Database name
-  -p, --password=<value>  (required) Password
+  -p, --profile=<value>   (required) Profile name
   -u, --user=<value>      (required) Username
       --host=<value>      (required) MySQL host
-      --profile=<value>   Profile name to update
-      --[no-]ssl          Use SSL
+      --password=<value>  (required) Password
+      --port=<value>      (required) MySQL port
+      --ssl               (required) Use SSL
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Update an existing MySQL connection profile
+  Update MySQL authentication
 
 EXAMPLES
-  $ mq mysql auth update --ssl
+  $ mq mysql auth update
 
-  $ mq mysql auth update --profile staging
+  $ mq mysql auth update -p test
 ```
 
-_See code: [src/commands/mysql/auth/update.ts](https://github.com/hesedcasa/mysql/blob/v0.2.2/src/commands/mysql/auth/update.ts)_
+_See code: [src/commands/mysql/auth/update.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/auth/update.ts)_
 
 ## `mq mysql databases`
 
@@ -154,7 +229,7 @@ EXAMPLES
   $ mq mysql databases --profile staging
 ```
 
-_See code: [src/commands/mysql/databases.ts](https://github.com/hesedcasa/mysql/blob/v0.2.2/src/commands/mysql/databases.ts)_
+_See code: [src/commands/mysql/databases.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/databases.ts)_
 
 ## `mq mysql describe-table TABLE`
 
@@ -181,7 +256,7 @@ EXAMPLES
   $ mq mysql describe-table orders --format json --profile prod
 ```
 
-_See code: [src/commands/mysql/describe-table.ts](https://github.com/hesedcasa/mysql/blob/v0.2.2/src/commands/mysql/describe-table.ts)_
+_See code: [src/commands/mysql/describe-table.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/describe-table.ts)_
 
 ## `mq mysql explain-query QUERY`
 
@@ -208,7 +283,7 @@ EXAMPLES
   $ mq mysql explain-query "SELECT * FROM orders JOIN users ON orders.user_id = users.id" --format json
 ```
 
-_See code: [src/commands/mysql/explain-query.ts](https://github.com/hesedcasa/mysql/blob/v0.2.2/src/commands/mysql/explain-query.ts)_
+_See code: [src/commands/mysql/explain-query.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/explain-query.ts)_
 
 ## `mq mysql indexes TABLE`
 
@@ -235,7 +310,7 @@ EXAMPLES
   $ mq mysql indexes orders --format json --profile prod
 ```
 
-_See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.2.2/src/commands/mysql/indexes.ts)_
+_See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/indexes.ts)_
 
 ## `mq mysql query QUERY`
 
@@ -265,7 +340,7 @@ EXAMPLES
   $ mq mysql query "DELETE FROM sessions" --profile prod --skip-confirmation
 ```
 
-_See code: [src/commands/mysql/query.ts](https://github.com/hesedcasa/mysql/blob/v0.2.2/src/commands/mysql/query.ts)_
+_See code: [src/commands/mysql/query.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/query.ts)_
 
 ## `mq mysql tables`
 
@@ -287,5 +362,5 @@ EXAMPLES
   $ mq mysql tables --profile local
 ```
 
-_See code: [src/commands/mysql/tables.ts](https://github.com/hesedcasa/mysql/blob/v0.2.2/src/commands/mysql/tables.ts)_
+_See code: [src/commands/mysql/tables.ts](https://github.com/hesedcasa/mysql/blob/v0.3.0/src/commands/mysql/tables.ts)_
 <!-- commandsstop -->
