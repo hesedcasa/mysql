@@ -1,89 +1,19 @@
-import {confirm, input} from '@inquirer/prompts'
-import {Command, Flags} from '@oclif/core'
-import {action} from '@oclif/core/ux'
-import {default as fs} from 'fs-extra'
-import {default as path} from 'node:path'
+import {createAuthUpdateCommand, type FieldDef} from '@hesed/plugin-lib'
 
-import type {ConnectionTestResult, MySQLJsonConfig} from '../../../mysql/index.js'
+import {closeConnections, testDirectConnection} from '../../../mysql/index.js'
 
-import {testDirectConnection} from '../../../mysql/index.js'
+const fields: FieldDef[] = [
+  {description: 'MySQL host', name: 'host', type: 'string'},
+  {default: 3306, description: 'MySQL port', name: 'port', type: 'number'},
+  {char: 'u', description: 'Username', name: 'user', type: 'string'},
+  {description: 'Password', name: 'password', type: 'string'},
+  {char: 'd', description: 'Database name', name: 'database', type: 'string'},
+  {default: false, description: 'Use SSL', name: 'ssl', required: false, type: 'boolean'},
+]
 
-export default class AuthUpdate extends Command {
-  static override args = {}
-  static override description = 'Update an existing MySQL connection profile'
-  static override enableJsonFlag = true
-  static override examples = [
-    '<%= config.bin %> <%= command.id %> --ssl',
-    '<%= config.bin %> <%= command.id %> --profile staging',
-  ]
-  static override flags = {
-    database: Flags.string({char: 'd', description: 'Database name', required: !process.stdout.isTTY}),
-    host: Flags.string({description: 'MySQL host', required: !process.stdout.isTTY}),
-    password: Flags.string({char: 'p', description: 'Password', required: !process.stdout.isTTY}),
-    port: Flags.integer({char: 'P', description: 'MySQL port', required: !process.stdout.isTTY}),
-    profile: Flags.string({description: 'Profile name to update', required: false}),
-    ssl: Flags.boolean({allowNo: true, default: false, description: 'Use SSL', required: false}),
-    user: Flags.string({char: 'u', description: 'Username', required: !process.stdout.isTTY}),
-  }
-
-  public async run(): Promise<ConnectionTestResult | void> {
-    const {flags} = await this.parse(AuthUpdate)
-    const configPath = path.join(this.config.configDir, 'mysql-config.json')
-    let config: MySQLJsonConfig
-    try {
-      config = await fs.readJSON(configPath)
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error)
-      if (msg.toLowerCase().includes('no such file or directory')) {
-        this.log('Run auth:add instead')
-      } else {
-        this.log(msg)
-      }
-
-      return
-    }
-
-    const profileName = flags.profile ?? config.defaultProfile
-    const existingProfile = config.profiles[profileName]
-    if (!existingProfile) {
-      this.error(`Profile "${profileName}" not found. Available: ${Object.keys(config.profiles).join(', ')}`)
-    }
-
-    const host =
-      flags.host ??
-      (await input({default: existingProfile.host, message: 'MySQL host:', prefill: 'tab', required: true}))
-    const port =
-      flags.port ??
-      Number(await input({default: String(existingProfile.port), message: 'Port:', prefill: 'tab', required: true}))
-    const user =
-      flags.user ?? (await input({default: existingProfile.user, message: 'Username:', prefill: 'tab', required: true}))
-    const password =
-      flags.password ??
-      (await input({default: existingProfile.password, message: 'Password:', prefill: 'tab', required: true}))
-    const database =
-      flags.database ??
-      (await input({default: existingProfile.database, message: 'Database:', prefill: 'tab', required: true}))
-
-    const answer = await confirm({message: `Override profile "${profileName}"?`})
-    if (!answer) {
-      return
-    }
-
-    config.profiles[profileName] = {database, host, password, port, ssl: flags.ssl, user}
-    await fs.writeJSON(configPath, config, {mode: 0o600})
-
-    action.start('Testing connection')
-    const updatedConfig: MySQLJsonConfig = await fs.readJSON(configPath)
-    const result = await testDirectConnection(updatedConfig.profiles[profileName])
-
-    if (result.success) {
-      action.stop('✓ successful')
-      this.log(`Profile "${profileName}" updated successfully`)
-    } else {
-      action.stop('✗ failed')
-      this.error('Connection failed. Please check your configuration.')
-    }
-
-    return result
-  }
-}
+export default createAuthUpdateCommand({
+  clearClients: closeConnections,
+  fields,
+  serviceName: 'MySQL',
+  testConnection: testDirectConnection,
+})

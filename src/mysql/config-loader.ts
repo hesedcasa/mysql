@@ -1,6 +1,13 @@
 import type {ConnectionOptions as MySQL2ConnectionOptions} from 'mysql2/promise'
 
-import type {DatabaseProfile} from '../config.js'
+export interface DatabaseProfile {
+  database: string
+  host: string
+  password: string
+  port: number
+  ssl?: boolean
+  user: string
+}
 
 /**
  * Safety configuration for query execution

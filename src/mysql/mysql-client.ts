@@ -1,5 +1,8 @@
-import type {DatabaseProfile} from '../config.js'
-import type {MySQLConfig} from './config-loader.js'
+import type {Config} from '@oclif/core'
+
+import {createProfileManager} from '@hesed/plugin-lib'
+
+import type {DatabaseProfile, MySQLConfig} from './config-loader.js'
 import type {
   ConnectionTestResult,
   DatabaseListResult,
@@ -11,161 +14,120 @@ import type {
   TableStructureResult,
 } from './database.js'
 
-import {readConfig} from '../config.js'
 import {MySQLUtil} from './mysql-utils.js'
 
 let mysqlUtil: MySQLUtil | null = null
 let cachedConfig: MySQLConfig | null = null
-let cachedConfigDir: string
-
-/**
- * Set the config directory for the singleton client
- * @param dir - Oclif config directory path
- */
-export function setConfigDir(dir: string): void {
-  cachedConfigDir = dir
-}
 
 /**
  * Initialize (or return cached) MySQLUtil
  */
-async function initMySQL(): Promise<MySQLUtil> {
+async function initMySQL(config: Config): Promise<MySQLUtil> {
   if (mysqlUtil) return mysqlUtil
 
-  if (!cachedConfigDir) {
-    throw new Error('MySQL client not initialized. Call setConfigDir() before running commands.')
+  const pm = createProfileManager<DatabaseProfile>(config)
+
+  const profiles = await pm.readProfiles()
+  if (!profiles) {
+    throw new Error(`No profile found.`)
   }
 
-  const jsonConfig = await readConfig(cachedConfigDir, console.error)
-  if (!jsonConfig) {
-    throw new Error('Missing connection config. Run "mq mysql auth add" to create a config.')
+  const defaultProfile = await pm.getDefaultProfile()
+  if (!defaultProfile) {
+    throw new Error(`Missing default profile.`)
   }
 
   cachedConfig = {
     defaultFormat: 'table',
-    defaultProfile: jsonConfig.defaultProfile,
-    profiles: jsonConfig.profiles,
+    defaultProfile,
+    profiles,
     safety: {
       blacklistedOperations: ['DROP DATABASE'],
       defaultLimit: 100,
       requireConfirmationFor: ['DELETE', 'UPDATE', 'DROP', 'TRUNCATE', 'ALTER'],
     },
   }
+
   mysqlUtil = new MySQLUtil(cachedConfig)
   return mysqlUtil
 }
 
-/**
- * Get the loaded MySQL config, initializing if needed
- */
-export async function getMySQLConfig(): Promise<MySQLConfig> {
-  if (!cachedConfig) {
-    await initMySQL()
-  }
-
-  return cachedConfig!
-}
-
-/**
- * Execute SQL query
- * @param query - SQL query to execute
- * @param profile - Database profile name
- * @param format - Output format
- * @param skipConfirmation - Skip confirmation for destructive operations
- */
+// eslint-disable-next-line max-params
 export async function executeQuery(
+  config: Config,
   query: string,
-  profile: string,
+  profile?: string,
   format: OutputFormat = 'table',
   skipConfirmation = false,
 ): Promise<QueryResult> {
-  return (await initMySQL()).executeQuery(profile, query, format, skipConfirmation)
+  const profileName = profile ?? cachedConfig?.defaultProfile ?? 'default'
+
+  return (await initMySQL(config)).executeQuery(profileName, query, format, skipConfirmation)
 }
 
-/**
- * List all databases
- * @param profile - Database profile name
- */
-export async function listDatabases(profile: string): Promise<DatabaseListResult> {
-  return (await initMySQL()).listDatabases(profile)
+export async function listDatabases(config: Config, profile?: string): Promise<DatabaseListResult> {
+  const profileName = profile ?? cachedConfig?.defaultProfile ?? 'default'
+
+  return (await initMySQL(config)).listDatabases(profileName)
 }
 
-/**
- * List all tables in current database
- * @param profile - Database profile name
- */
-export async function listTables(profile: string): Promise<TableListResult> {
-  return (await initMySQL()).listTables(profile)
+export async function listTables(config: Config, profile?: string): Promise<TableListResult> {
+  const profileName = profile ?? cachedConfig?.defaultProfile ?? 'default'
+
+  return (await initMySQL(config)).listTables(profileName)
 }
 
-/**
- * Describe table structure
- * @param profile - Database profile name
- * @param table - Table name
- * @param format - Output format
- */
 export async function describeTable(
-  profile: string,
+  config: Config,
   table: string,
+  profile?: string,
   format: 'json' | 'table' | 'toon' = 'table',
 ): Promise<TableStructureResult> {
-  return (await initMySQL()).describeTable(profile, table, format)
+  const profileName = profile ?? cachedConfig?.defaultProfile ?? 'default'
+
+  return (await initMySQL(config)).describeTable(profileName, table, format)
 }
 
-/**
- * Show table indexes
- * @param profile - Database profile name
- * @param table - Table name
- * @param format - Output format
- */
 export async function showIndexes(
-  profile: string,
+  config: Config,
   table: string,
+  profile?: string,
   format: 'json' | 'table' | 'toon' = 'table',
 ): Promise<IndexResult> {
-  return (await initMySQL()).showIndexes(profile, table, format)
+  const profileName = profile ?? cachedConfig?.defaultProfile ?? 'default'
+
+  return (await initMySQL(config)).showIndexes(profileName, table, format)
 }
 
-/**
- * Explain query execution plan
- * @param profile - Database profile name
- * @param query - SQL query to explain
- * @param format - Output format
- */
 export async function explainQuery(
-  profile: string,
+  config: Config,
   query: string,
+  profile?: string,
   format: 'json' | 'table' | 'toon' = 'table',
 ): Promise<ExplainResult> {
-  return (await initMySQL()).explainQuery(profile, query, format)
+  const profileName = profile ?? cachedConfig?.defaultProfile ?? 'default'
+
+  return (await initMySQL(config)).explainQuery(profileName, query, format)
 }
 
-/**
- * Test a connection directly with profile options (without loading JSON config)
- * @param profile - Database connection profile options
- */
 export async function testDirectConnection(profile: DatabaseProfile): Promise<ConnectionTestResult> {
-  const tempConfig: MySQLConfig = {
+  const testConfig: MySQLConfig = {
     defaultFormat: 'table',
-    defaultProfile: '_auth',
-    profiles: {_auth: profile},
+    defaultProfile: 'default',
+    profiles: {default: profile},
     safety: {
-      blacklistedOperations: [],
+      blacklistedOperations: ['DROP DATABASE'],
       defaultLimit: 100,
-      requireConfirmationFor: [],
+      requireConfirmationFor: ['DELETE', 'UPDATE', 'DROP', 'TRUNCATE', 'ALTER'],
     },
   }
-  const tempUtil = new MySQLUtil(tempConfig)
-  try {
-    return await tempUtil.testConnection('_auth')
-  } finally {
-    await tempUtil.closeAll()
-  }
+
+  const util = new MySQLUtil(testConfig)
+  const result = await util.testConnection('default')
+  await util.closeAll()
+  return result
 }
 
-/**
- * Close all connections
- */
 export async function closeConnections(): Promise<void> {
   if (mysqlUtil) {
     await mysqlUtil.closeAll()

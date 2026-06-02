@@ -1,6 +1,6 @@
 import {Args, Command, Flags} from '@oclif/core'
 
-import {closeConnections, describeTable, getMySQLConfig, setConfigDir} from '../../mysql/index.js'
+import {closeConnections, describeTable} from '../../mysql/index.js'
 
 export default class MySQLDescribeTable extends Command {
   static override args = {
@@ -23,15 +23,12 @@ export default class MySQLDescribeTable extends Command {
   public async run(): Promise<void> {
     const {args, flags} = await this.parse(MySQLDescribeTable)
 
-    setConfigDir(this.config.configDir)
-    let profile: string
-    try {
-      profile = flags.profile ?? (await getMySQLConfig()).defaultProfile
-    } catch (error: unknown) {
-      this.error(error instanceof Error ? error.message : String(error))
-    }
-
-    const result = await describeTable(profile, args.table, flags.format as 'json' | 'table' | 'toon')
+    const result = await describeTable(
+      this.config,
+      args.table,
+      flags.profile,
+      flags.format as 'json' | 'table' | 'toon',
+    )
     await closeConnections()
 
     if (result.success) {

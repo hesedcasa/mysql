@@ -1,6 +1,6 @@
 import {Command, Flags} from '@oclif/core'
 
-import {closeConnections, getMySQLConfig, listTables, setConfigDir} from '../../mysql/index.js'
+import {closeConnections, listTables} from '../../mysql/index.js'
 
 export default class MySQLTables extends Command {
   static override description = 'List all tables in the current MySQL database'
@@ -15,15 +15,7 @@ export default class MySQLTables extends Command {
   public async run(): Promise<void> {
     const {flags} = await this.parse(MySQLTables)
 
-    setConfigDir(this.config.configDir)
-    let profile: string
-    try {
-      profile = flags.profile ?? (await getMySQLConfig()).defaultProfile
-    } catch (error: unknown) {
-      this.error(error instanceof Error ? error.message : String(error))
-    }
-
-    const result = await listTables(profile)
+    const result = await listTables(this.config, flags.profile)
     await closeConnections()
 
     if (result.success) {
