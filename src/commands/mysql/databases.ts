@@ -1,6 +1,6 @@
 import {Command, Flags} from '@oclif/core'
 
-import {closeConnections, getMySQLConfig, listDatabases, setConfigDir} from '../../mysql/index.js'
+import {closeConnections, listDatabases} from '../../mysql/index.js'
 
 export default class MySQLDatabases extends Command {
   static override description = 'List all databases accessible on the MySQL server'
@@ -15,15 +15,7 @@ export default class MySQLDatabases extends Command {
   public async run(): Promise<void> {
     const {flags} = await this.parse(MySQLDatabases)
 
-    setConfigDir(this.config.configDir)
-    let profile: string
-    try {
-      profile = flags.profile ?? (await getMySQLConfig()).defaultProfile
-    } catch (error: unknown) {
-      this.error(error instanceof Error ? error.message : String(error))
-    }
-
-    const result = await listDatabases(profile)
+    const result = await listDatabases(this.config, flags.profile)
     await closeConnections()
 
     if (result.success) {

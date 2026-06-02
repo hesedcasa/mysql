@@ -7,10 +7,7 @@ describe('mysql:explain-query', () => {
   let MySQLExplainQuery: any
   let explainQueryStub: SinonStub
   let closeConnectionsStub: SinonStub
-  let getMySQLConfigStub: SinonStub
-  let setConfigDirStub: SinonStub
 
-  const mockConfig = {defaultFormat: 'table', defaultProfile: 'local'}
   const mockResult = {
     plan: [],
     result: '┌──────┬────────────┐\n│ type │ table      │\n└──────┴────────────┘',
@@ -20,15 +17,11 @@ describe('mysql:explain-query', () => {
   beforeEach(async () => {
     explainQueryStub = stub().resolves(mockResult)
     closeConnectionsStub = stub().resolves()
-    getMySQLConfigStub = stub().resolves(mockConfig)
-    setConfigDirStub = stub()
 
     const imported = await esmock('../../../src/commands/mysql/explain-query.js', {
       '../../../src/mysql/index.js': {
         closeConnections: closeConnectionsStub,
         explainQuery: explainQueryStub,
-        getMySQLConfig: getMySQLConfigStub,
-        setConfigDir: setConfigDirStub,
       },
     })
     MySQLExplainQuery = imported.default
@@ -43,9 +36,12 @@ describe('mysql:explain-query', () => {
 
     await cmd.run()
 
-    expect(getMySQLConfigStub.calledOnce).to.be.true
     expect(explainQueryStub.calledOnce).to.be.true
-    expect(explainQueryStub.firstCall.args).to.deep.equal(['local', 'SELECT * FROM users WHERE id = 1', 'table'])
+    expect(explainQueryStub.firstCall.args.slice(1)).to.deep.equal([
+      'SELECT * FROM users WHERE id = 1',
+      undefined,
+      'table',
+    ])
     expect(closeConnectionsStub.calledOnce).to.be.true
     expect(logStub.calledOnce).to.be.true
     expect(logStub.firstCall.args[0]).to.equal(mockResult.result)
@@ -60,8 +56,7 @@ describe('mysql:explain-query', () => {
 
     await cmd.run()
 
-    expect(getMySQLConfigStub.called).to.be.false
-    expect(explainQueryStub.firstCall.args).to.deep.equal(['prod', 'SELECT 1', 'json'])
+    expect(explainQueryStub.firstCall.args.slice(1)).to.deep.equal(['SELECT 1', 'prod', 'json'])
   })
 
   it('throws error when explain fails', async () => {

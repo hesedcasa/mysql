@@ -1,6 +1,5 @@
 import type {Connection, FieldPacket, OkPacket, RowDataPacket} from 'mysql2/promise'
 
-import {encode} from '@toon-format/toon'
 import mysql from 'mysql2/promise'
 
 import type {MySQLConfig} from './config-loader.js'
@@ -17,12 +16,9 @@ import type {
 } from './database.js'
 
 import {getMySQLConnectionOptions} from './config-loader.js'
+import {FORMATTERS} from './formatters.js'
 import {analyzeQuery, applyDefaultLimit, checkBlacklist, getQueryType, requiresConfirmation} from './query-validator.js'
 
-/**
- * MySQL Database Utility
- * Provides core database operations with safety validation and formatting
- */
 export class MySQLUtil implements DatabaseUtil {
   private config: MySQLConfig
   private connections: Map<string, Promise<Connection>>
@@ -32,18 +28,12 @@ export class MySQLUtil implements DatabaseUtil {
     this.connections = new Map()
   }
 
-  /**
-   * Close all connections
-   */
   async closeAll(): Promise<void> {
     const entries = [...this.connections.values()]
     this.connections.clear()
     await Promise.allSettled(entries.map(async (connPromise) => (await connPromise).end()))
   }
 
-  /**
-   * Describe table structure
-   */
   async describeTable(
     profileName: string,
     table: string,
@@ -52,18 +42,8 @@ export class MySQLUtil implements DatabaseUtil {
     try {
       const connection = await this.getConnection(profileName)
       const [rows, fields] = await connection.query(`DESCRIBE ${table}`)
-
-      let result = ''
-      if (format === 'json') {
-        result += this.formatAsJson(rows as RowDataPacket[])
-      } else if (format === 'toon') {
-        result += this.formatAsToon(rows as RowDataPacket[])
-      } else {
-        result += this.formatAsTable(rows as RowDataPacket[], fields as FieldPacket[])
-      }
-
       return {
-        result,
+        result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
         structure: rows as RowDataPacket[],
         success: true,
       }
@@ -76,9 +56,6 @@ export class MySQLUtil implements DatabaseUtil {
     }
   }
 
-  /**
-   * Validate and execute a SQL query
-   */
   async executeQuery(
     profileName: string,
     query: string,
@@ -153,9 +130,6 @@ export class MySQLUtil implements DatabaseUtil {
     }
   }
 
-  /**
-   * Explain query execution plan
-   */
   async explainQuery(
     profileName: string,
     query: string,
@@ -164,19 +138,9 @@ export class MySQLUtil implements DatabaseUtil {
     try {
       const connection = await this.getConnection(profileName)
       const [rows, fields] = await connection.query(`EXPLAIN ${query}`)
-
-      let result = ''
-      if (format === 'json') {
-        result += this.formatAsJson(rows as RowDataPacket[])
-      } else if (format === 'toon') {
-        result += this.formatAsToon(rows as RowDataPacket[])
-      } else {
-        result += this.formatAsTable(rows as RowDataPacket[], fields as FieldPacket[])
-      }
-
       return {
         plan: rows as RowDataPacket[],
-        result,
+        result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
         success: true,
       }
     } catch (error: unknown) {
@@ -188,104 +152,6 @@ export class MySQLUtil implements DatabaseUtil {
     }
   }
 
-  /**
-   * Format query results as CSV
-   */
-  formatAsCsv(rows: RowDataPacket[], fields: FieldPacket[]): string {
-    if (!rows || rows.length === 0) {
-      return ''
-    }
-
-    const columnNames = fields.map((f) => f.name)
-    let csv = columnNames.join(',') + '\n'
-
-    for (const row of rows) {
-      const values = columnNames.map((name) => {
-        const value = row[name] ?? ''
-        const str = String(value)
-        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-          return '"' + str.replaceAll('"', '""') + '"'
-        }
-
-        return str
-      })
-      csv += values.join(',') + '\n'
-    }
-
-    return csv
-  }
-
-  /**
-   * Format query results as JSON
-   */
-  formatAsJson(rows: RowDataPacket[]): string {
-    return JSON.stringify(rows, null, 2)
-  }
-
-  /**
-   * Format query results as table
-   */
-  formatAsTable(rows: RowDataPacket[], fields: FieldPacket[]): string {
-    if (!rows || rows.length === 0) {
-      return 'No results'
-    }
-
-    const columnNames = fields.map((f) => f.name)
-    const columnWidths = columnNames.map((name) => {
-      const dataWidth = Math.max(...rows.map((row) => String(row[name] ?? '').length))
-      return Math.max(name.length, dataWidth, 3)
-    })
-
-    let table = '┌' + columnWidths.map((w) => '─'.repeat(w + 2)).join('┬') + '┐\n'
-    table += '│ ' + columnNames.map((name, i) => name.padEnd(columnWidths[i])).join(' │ ') + ' │\n'
-    table += '├' + columnWidths.map((w) => '─'.repeat(w + 2)).join('┼') + '┤\n'
-
-    for (const row of rows) {
-      table +=
-        '│ ' +
-        columnNames
-          .map((name, i) => {
-            const value = row[name] ?? 'NULL'
-            return String(value).padEnd(columnWidths[i])
-          })
-          .join(' │ ') +
-        ' │\n'
-    }
-
-    table += '└' + columnWidths.map((w) => '─'.repeat(w + 2)).join('┴') + '┘'
-
-    return table
-  }
-
-  /**
-   * Format query results as TOON
-   */
-  formatAsToon(rows: RowDataPacket[]): string {
-    if (!rows || rows.length === 0) {
-      return ''
-    }
-
-    const serializedRows = rows.map((row) => {
-      const serialized: Record<string, unknown> = {}
-      for (const [key, value] of Object.entries(row)) {
-        if (value instanceof Date) {
-          serialized[key] = Number.isNaN(value.getTime()) ? null : value.toISOString()
-        } else if (Buffer.isBuffer(value)) {
-          serialized[key] = value.toString('base64')
-        } else {
-          serialized[key] = value
-        }
-      }
-
-      return serialized
-    })
-
-    return encode(serializedRows)
-  }
-
-  /**
-   * List all databases
-   */
   async listDatabases(profileName: string): Promise<DatabaseListResult> {
     try {
       const connection = await this.getConnection(profileName)
@@ -305,9 +171,6 @@ export class MySQLUtil implements DatabaseUtil {
     }
   }
 
-  /**
-   * List all tables in current database
-   */
   async listTables(profileName: string): Promise<TableListResult> {
     try {
       const connection = await this.getConnection(profileName)
@@ -331,9 +194,6 @@ export class MySQLUtil implements DatabaseUtil {
     }
   }
 
-  /**
-   * Show table indexes
-   */
   async showIndexes(
     profileName: string,
     table: string,
@@ -342,19 +202,9 @@ export class MySQLUtil implements DatabaseUtil {
     try {
       const connection = await this.getConnection(profileName)
       const [rows, fields] = await connection.query(`SHOW INDEXES FROM ${table}`)
-
-      let result = ''
-      if (format === 'json') {
-        result += this.formatAsJson(rows as RowDataPacket[])
-      } else if (format === 'toon') {
-        result += this.formatAsToon(rows as RowDataPacket[])
-      } else {
-        result += this.formatAsTable(rows as RowDataPacket[], fields as FieldPacket[])
-      }
-
       return {
         indexes: rows as RowDataPacket[],
-        result,
+        result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
         success: true,
       }
     } catch (error: unknown) {
@@ -366,9 +216,6 @@ export class MySQLUtil implements DatabaseUtil {
     }
   }
 
-  /**
-   * Test database connection
-   */
   async testConnection(profileName: string): Promise<ConnectionTestResult> {
     try {
       const connection = await this.getConnection(profileName)
@@ -390,40 +237,15 @@ export class MySQLUtil implements DatabaseUtil {
     }
   }
 
-  /**
-   * Format rows for SELECT/SHOW/DESCRIBE/EXPLAIN query result
-   */
-  private formatSelectResult(rows: RowDataPacket[], fields: FieldPacket[], format: OutputFormat): string {
-    const rowCount = Array.isArray(rows) ? rows.length : 0
-    let result = `Query executed successfully. Rows returned: ${rowCount}\n\n`
-
-    switch (format) {
-      case 'csv': {
-        result += this.formatAsCsv(rows, fields)
-        break
-      }
-
-      case 'json': {
-        result += this.formatAsJson(rows)
-        break
-      }
-
-      case 'toon': {
-        result += this.formatAsToon(rows)
-        break
-      }
-
-      default: {
-        result += this.formatAsTable(rows, fields)
-      }
-    }
-
-    return result
+  private formatRows(rows: RowDataPacket[], fields: FieldPacket[], format: OutputFormat): string {
+    return FORMATTERS[format](rows, fields)
   }
 
-  /**
-   * Get or create MySQL connection for a profile
-   */
+  private formatSelectResult(rows: RowDataPacket[], fields: FieldPacket[], format: OutputFormat): string {
+    const rowCount = Array.isArray(rows) ? rows.length : 0
+    return `Query executed successfully. Rows returned: ${rowCount}\n\n` + this.formatRows(rows, fields, format)
+  }
+
   private async getConnection(profileName: string): Promise<Connection> {
     const existing = this.connections.get(profileName)
     if (existing) {

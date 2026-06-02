@@ -7,24 +7,17 @@ describe('mysql:query', () => {
   let MySQLQuery: any
   let executeQueryStub: SinonStub
   let closeConnectionsStub: SinonStub
-  let getMySQLConfigStub: SinonStub
-  let setConfigDirStub: SinonStub
 
-  const mockConfig = {defaultFormat: 'table', defaultProfile: 'local'}
   const mockResult = {result: 'Query executed successfully. Rows returned: 2\n\nid | name\n1  | Alice', success: true}
 
   beforeEach(async () => {
     executeQueryStub = stub().resolves(mockResult)
     closeConnectionsStub = stub().resolves()
-    getMySQLConfigStub = stub().resolves(mockConfig)
-    setConfigDirStub = stub()
 
     const imported = await esmock('../../../src/commands/mysql/query.js', {
       '../../../src/mysql/index.js': {
         closeConnections: closeConnectionsStub,
         executeQuery: executeQueryStub,
-        getMySQLConfig: getMySQLConfigStub,
-        setConfigDir: setConfigDirStub,
       },
     })
     MySQLQuery = imported.default
@@ -39,9 +32,8 @@ describe('mysql:query', () => {
 
     await cmd.run()
 
-    expect(getMySQLConfigStub.calledOnce).to.be.true
     expect(executeQueryStub.calledOnce).to.be.true
-    expect(executeQueryStub.firstCall.args).to.deep.equal(['SELECT * FROM users', 'local', 'table', false])
+    expect(executeQueryStub.firstCall.args.slice(1)).to.deep.equal(['SELECT * FROM users', undefined, 'table', false])
     expect(closeConnectionsStub.calledOnce).to.be.true
     expect(logStub.calledOnce).to.be.true
     expect(logStub.firstCall.args[0]).to.equal(mockResult.result)
@@ -56,8 +48,7 @@ describe('mysql:query', () => {
 
     await cmd.run()
 
-    expect(getMySQLConfigStub.called).to.be.false
-    expect(executeQueryStub.firstCall.args).to.deep.equal(['SELECT 1', 'prod', 'json', false])
+    expect(executeQueryStub.firstCall.args.slice(1)).to.deep.equal(['SELECT 1', 'prod', 'json', false])
     expect(logStub.calledOnce).to.be.true
   })
 
@@ -70,7 +61,7 @@ describe('mysql:query', () => {
 
     await cmd.run()
 
-    expect(executeQueryStub.firstCall.args[3]).to.be.true
+    expect(executeQueryStub.firstCall.args[4]).to.be.true
   })
 
   it('throws error when query fails', async () => {

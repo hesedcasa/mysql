@@ -7,24 +7,17 @@ describe('mysql:describe-table', () => {
   let MySQLDescribeTable: any
   let describeTableStub: SinonStub
   let closeConnectionsStub: SinonStub
-  let getMySQLConfigStub: SinonStub
-  let setConfigDirStub: SinonStub
 
-  const mockConfig = {defaultFormat: 'table', defaultProfile: 'local'}
   const mockResult = {result: '┌─────┬──────┐\n│ id  │ name │\n└─────┴──────┘', structure: [], success: true}
 
   beforeEach(async () => {
     describeTableStub = stub().resolves(mockResult)
     closeConnectionsStub = stub().resolves()
-    getMySQLConfigStub = stub().resolves(mockConfig)
-    setConfigDirStub = stub()
 
     const imported = await esmock('../../../src/commands/mysql/describe-table.js', {
       '../../../src/mysql/index.js': {
         closeConnections: closeConnectionsStub,
         describeTable: describeTableStub,
-        getMySQLConfig: getMySQLConfigStub,
-        setConfigDir: setConfigDirStub,
       },
     })
     MySQLDescribeTable = imported.default
@@ -39,9 +32,8 @@ describe('mysql:describe-table', () => {
 
     await cmd.run()
 
-    expect(getMySQLConfigStub.calledOnce).to.be.true
     expect(describeTableStub.calledOnce).to.be.true
-    expect(describeTableStub.firstCall.args).to.deep.equal(['local', 'users', 'table'])
+    expect(describeTableStub.firstCall.args.slice(1)).to.deep.equal(['users', undefined, 'table'])
     expect(closeConnectionsStub.calledOnce).to.be.true
     expect(logStub.calledOnce).to.be.true
     expect(logStub.firstCall.args[0]).to.equal(mockResult.result)
@@ -56,8 +48,7 @@ describe('mysql:describe-table', () => {
 
     await cmd.run()
 
-    expect(getMySQLConfigStub.called).to.be.false
-    expect(describeTableStub.firstCall.args).to.deep.equal(['prod', 'orders', 'json'])
+    expect(describeTableStub.firstCall.args.slice(1)).to.deep.equal(['orders', 'prod', 'json'])
   })
 
   it('throws error when describe fails', async () => {

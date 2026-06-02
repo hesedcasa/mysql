@@ -1,6 +1,6 @@
 import {Args, Command, Flags} from '@oclif/core'
 
-import {closeConnections, explainQuery, getMySQLConfig, setConfigDir} from '../../mysql/index.js'
+import {closeConnections, explainQuery} from '../../mysql/index.js'
 
 export default class MySQLExplain extends Command {
   static override args = {
@@ -23,15 +23,7 @@ export default class MySQLExplain extends Command {
   public async run(): Promise<void> {
     const {args, flags} = await this.parse(MySQLExplain)
 
-    setConfigDir(this.config.configDir)
-    let profile: string
-    try {
-      profile = flags.profile ?? (await getMySQLConfig()).defaultProfile
-    } catch (error: unknown) {
-      this.error(error instanceof Error ? error.message : String(error))
-    }
-
-    const result = await explainQuery(profile, args.query, flags.format as 'json' | 'table' | 'toon')
+    const result = await explainQuery(this.config, args.query, flags.profile, flags.format as 'json' | 'table' | 'toon')
     await closeConnections()
 
     if (result.success) {

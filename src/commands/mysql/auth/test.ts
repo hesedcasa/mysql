@@ -1,49 +1,19 @@
-import {Command, Flags} from '@oclif/core'
-import {action} from '@oclif/core/ux'
+import {createAuthTestCommand, type FieldDef} from '@hesed/plugin-lib'
 
-import type {ConnectionTestResult} from '../../../mysql/index.js'
+import {closeConnections, testDirectConnection} from '../../../mysql/index.js'
 
-import {readConfig} from '../../../config.js'
-import {testDirectConnection} from '../../../mysql/index.js'
+const fields: FieldDef[] = [
+  {description: 'MySQL host', name: 'host', type: 'string'},
+  {default: 3306, description: 'MySQL port', name: 'port', type: 'number'},
+  {char: 'u', description: 'Username', name: 'user', type: 'string'},
+  {description: 'Password', name: 'password', type: 'string'},
+  {char: 'd', description: 'Database name', name: 'database', type: 'string'},
+  {default: false, description: 'Use SSL', name: 'ssl', required: false, type: 'boolean'},
+]
 
-export default class AuthTest extends Command {
-  static override args = {}
-  static override description = 'Test MySQL database connection'
-  static override enableJsonFlag = true
-  static override examples = [
-    '<%= config.bin %> <%= command.id %>',
-    '<%= config.bin %> <%= command.id %> --profile staging',
-  ]
-  static override flags = {
-    profile: Flags.string({description: 'Profile name to test', required: false}),
-  }
-
-  public async run(): Promise<ConnectionTestResult> {
-    const {flags} = await this.parse(AuthTest)
-    const config = await readConfig(this.config.configDir, this.log.bind(this))
-    if (!config) {
-      return {
-        error: 'Missing connection config',
-        success: false,
-      }
-    }
-
-    const profile = config.profiles[flags.profile ?? config.defaultProfile]
-    if (!profile) {
-      this.error(`Profile "${flags.profile}" not found. Available: ${Object.keys(config.profiles).join(', ')}`)
-    }
-
-    action.start('Testing connection')
-    const result = await testDirectConnection(profile)
-
-    if (result.success) {
-      action.stop('✓ successful')
-      this.log('Successfully connected to MySQL')
-    } else {
-      action.stop('✗ failed')
-      this.error('Failed to connect to MySQL.')
-    }
-
-    return result
-  }
-}
+export default createAuthTestCommand({
+  clearClients: closeConnections,
+  fields,
+  serviceName: 'MySQL',
+  testConnection: testDirectConnection,
+})

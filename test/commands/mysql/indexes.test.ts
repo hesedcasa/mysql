@@ -7,23 +7,16 @@ describe('mysql:indexes', () => {
   let MySQLShowIndexes: any
   let showIndexesStub: SinonStub
   let closeConnectionsStub: SinonStub
-  let getMySQLConfigStub: SinonStub
-  let setConfigDirStub: SinonStub
 
-  const mockConfig = {defaultFormat: 'table', defaultProfile: 'local'}
   const mockResult = {indexes: [], result: '┌──────────────┐\n│ PRIMARY (id) │\n└──────────────┘', success: true}
 
   beforeEach(async () => {
     showIndexesStub = stub().resolves(mockResult)
     closeConnectionsStub = stub().resolves()
-    getMySQLConfigStub = stub().resolves(mockConfig)
-    setConfigDirStub = stub()
 
     const imported = await esmock('../../../src/commands/mysql/indexes.js', {
       '../../../src/mysql/index.js': {
         closeConnections: closeConnectionsStub,
-        getMySQLConfig: getMySQLConfigStub,
-        setConfigDir: setConfigDirStub,
         showIndexes: showIndexesStub,
       },
     })
@@ -39,9 +32,8 @@ describe('mysql:indexes', () => {
 
     await cmd.run()
 
-    expect(getMySQLConfigStub.calledOnce).to.be.true
     expect(showIndexesStub.calledOnce).to.be.true
-    expect(showIndexesStub.firstCall.args).to.deep.equal(['local', 'users', 'table'])
+    expect(showIndexesStub.firstCall.args.slice(1)).to.deep.equal(['users', undefined, 'table'])
     expect(closeConnectionsStub.calledOnce).to.be.true
     expect(logStub.calledOnce).to.be.true
     expect(logStub.firstCall.args[0]).to.equal(mockResult.result)
@@ -56,8 +48,7 @@ describe('mysql:indexes', () => {
 
     await cmd.run()
 
-    expect(getMySQLConfigStub.called).to.be.false
-    expect(showIndexesStub.firstCall.args).to.deep.equal(['staging', 'orders', 'json'])
+    expect(showIndexesStub.firstCall.args.slice(1)).to.deep.equal(['orders', 'staging', 'json'])
   })
 
   it('throws error when show indexes fails', async () => {
