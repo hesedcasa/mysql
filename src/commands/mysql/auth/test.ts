@@ -13,6 +13,7 @@ const fields: FieldDef[] = [
 
 export default createAuthTestCommand({
   clearClients: closeConnections,
+  configFile: 'mysql-config.json',
   fields,
   serviceName: 'MySQL',
   testConnection: testDirectConnection,
