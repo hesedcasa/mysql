@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/hesedcasa/mysql/compare/v0.3.0...v0.4.0) (2026-06-04)
+
+
+### 🎉 Features
+
+* pass explicit configFile to auth commands and upgrade plugin-lib to 0.9.0 ([dbe7a74](https://github.com/hesedcasa/mysql/commit/dbe7a74f4eb246bf535c51dd129cc95faaffdfb4))
+
 ## [0.3.0](https://github.com/hesedcasa/mysql/compare/v0.2.2...v0.3.0) (2026-06-02)
 
 
