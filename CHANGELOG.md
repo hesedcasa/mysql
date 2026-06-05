@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/hesedcasa/mysql/compare/v0.4.0...v0.4.1) (2026-06-05)
+
+
+### 🛠️ Fixes
+
+* pass explicit configFile to initMySQL profile manager ([47ca4be](https://github.com/hesedcasa/mysql/commit/47ca4be6e00568f7722433728a1f9928f19ac0a1))
+
 ## [0.4.0](https://github.com/hesedcasa/mysql/compare/v0.3.0...v0.4.0) (2026-06-04)
 
 
