@@ -28,7 +28,7 @@ const DEFAULT_SAFETY_CONFIG = {
 async function initMySQL(config: Config): Promise<MySQLUtil> {
   if (mysqlUtil) return mysqlUtil
 
-  const pm = createProfileManager<DatabaseProfile>(config)
+  const pm = createProfileManager<DatabaseProfile>(config, undefined, 'mysql-config.json')
 
   const profiles = await pm.readProfiles()
   if (!profiles) {
