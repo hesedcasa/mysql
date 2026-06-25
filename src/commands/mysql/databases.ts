@@ -4,10 +4,7 @@ import {closeConnections, listDatabases} from '../../mysql/index.js'
 
 export default class MySQLDatabases extends Command {
   static override description = 'List all databases accessible on the MySQL server'
-  static override examples = [
-    '<%= config.bin %> <%= command.id %>',
-    '<%= config.bin %> <%= command.id %> -p staging',
-  ]
+  static override examples = ['<%= config.bin %> <%= command.id %>', '<%= config.bin %> <%= command.id %> -p staging']
   static override flags = {
     profile: Flags.string({char: 'p', description: 'Database profile name from config', required: false}),
   }
