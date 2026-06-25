@@ -26,7 +26,7 @@ $ npm install -g @hesed/mysql
 $ mq COMMAND
 running command...
 $ mq (--version)
-@hesed/mysql/0.4.1 linux-x64 node-v22.22.3
+@hesed/mysql/0.5.0 linux-x64 node-v22.23.0
 $ mq --help [COMMAND]
 USAGE
   $ mq COMMAND
@@ -80,7 +80,7 @@ EXAMPLES
   $ mq mysql auth add -p prod
 ```
 
-_See code: [src/commands/mysql/auth/add.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/auth/add.ts)_
+_See code: [src/commands/mysql/auth/add.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/auth/add.ts)_
 
 ## `mq mysql auth delete`
 
@@ -105,7 +105,7 @@ EXAMPLES
   $ mq mysql auth delete -p prod
 ```
 
-_See code: [src/commands/mysql/auth/delete.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/auth/delete.ts)_
+_See code: [src/commands/mysql/auth/delete.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/auth/delete.ts)_
 
 ## `mq mysql auth list`
 
@@ -125,7 +125,7 @@ EXAMPLES
   $ mq mysql auth list
 ```
 
-_See code: [src/commands/mysql/auth/list.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/auth/list.ts)_
+_See code: [src/commands/mysql/auth/list.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/auth/list.ts)_
 
 ## `mq mysql auth profile`
 
@@ -150,7 +150,7 @@ EXAMPLES
   $ mq mysql auth profile --default test
 ```
 
-_See code: [src/commands/mysql/auth/profile.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/auth/profile.ts)_
+_See code: [src/commands/mysql/auth/profile.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/auth/profile.ts)_
 
 ## `mq mysql auth test`
 
@@ -175,7 +175,7 @@ EXAMPLES
   $ mq mysql auth test -p prod
 ```
 
-_See code: [src/commands/mysql/auth/test.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/auth/test.ts)_
+_See code: [src/commands/mysql/auth/test.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/auth/test.ts)_
 
 ## `mq mysql auth update`
 
@@ -207,7 +207,7 @@ EXAMPLES
   $ mq mysql auth update -p test
 ```
 
-_See code: [src/commands/mysql/auth/update.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/auth/update.ts)_
+_See code: [src/commands/mysql/auth/update.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/auth/update.ts)_
 
 ## `mq mysql databases`
 
@@ -215,10 +215,10 @@ List all databases accessible on the MySQL server
 
 ```
 USAGE
-  $ mq mysql databases [--profile <value>]
+  $ mq mysql databases [-p <value>]
 
 FLAGS
-  --profile=<value>  Database profile name from config
+  -p, --profile=<value>  Database profile name from config
 
 DESCRIPTION
   List all databases accessible on the MySQL server
@@ -226,10 +226,10 @@ DESCRIPTION
 EXAMPLES
   $ mq mysql databases
 
-  $ mq mysql databases --profile staging
+  $ mq mysql databases -p staging
 ```
 
-_See code: [src/commands/mysql/databases.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/databases.ts)_
+_See code: [src/commands/mysql/databases.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/databases.ts)_
 
 ## `mq mysql describe-table TABLE`
 
@@ -237,15 +237,15 @@ Describe the structure of a MySQL table
 
 ```
 USAGE
-  $ mq mysql describe-table TABLE [--format table|json|toon] [--profile <value>]
+  $ mq mysql describe-table TABLE [--format table|json|toon] [-p <value>]
 
 ARGUMENTS
   TABLE  Table name to describe
 
 FLAGS
-  --format=<option>  [default: table] Output format
-                     <options: table|json|toon>
-  --profile=<value>  Database profile name from config
+  -p, --profile=<value>  Database profile name from config
+      --format=<option>  [default: table] Output format
+                         <options: table|json|toon>
 
 DESCRIPTION
   Describe the structure of a MySQL table
@@ -253,10 +253,10 @@ DESCRIPTION
 EXAMPLES
   $ mq mysql describe-table users
 
-  $ mq mysql describe-table orders --format json --profile prod
+  $ mq mysql describe-table orders --format json -p prod
 ```
 
-_See code: [src/commands/mysql/describe-table.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/describe-table.ts)_
+_See code: [src/commands/mysql/describe-table.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/describe-table.ts)_
 
 ## `mq mysql explain-query QUERY`
 
@@ -264,15 +264,15 @@ Show the execution plan for a MySQL query
 
 ```
 USAGE
-  $ mq mysql explain-query QUERY [--format table|json|toon] [--profile <value>]
+  $ mq mysql explain-query QUERY [--format table|json|toon] [-p <value>]
 
 ARGUMENTS
   QUERY  SQL query to explain
 
 FLAGS
-  --format=<option>  [default: table] Output format
-                     <options: table|json|toon>
-  --profile=<value>  Database profile name from config
+  -p, --profile=<value>  Database profile name from config
+      --format=<option>  [default: table] Output format
+                         <options: table|json|toon>
 
 DESCRIPTION
   Show the execution plan for a MySQL query
@@ -283,7 +283,7 @@ EXAMPLES
   $ mq mysql explain-query "SELECT * FROM orders JOIN users ON orders.user_id = users.id" --format json
 ```
 
-_See code: [src/commands/mysql/explain-query.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/explain-query.ts)_
+_See code: [src/commands/mysql/explain-query.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/explain-query.ts)_
 
 ## `mq mysql indexes TABLE`
 
@@ -291,15 +291,15 @@ Show indexes for a MySQL table
 
 ```
 USAGE
-  $ mq mysql indexes TABLE [--format table|json|toon] [--profile <value>]
+  $ mq mysql indexes TABLE [--format table|json|toon] [-p <value>]
 
 ARGUMENTS
   TABLE  Table name to show indexes for
 
 FLAGS
-  --format=<option>  [default: table] Output format
-                     <options: table|json|toon>
-  --profile=<value>  Database profile name from config
+  -p, --profile=<value>  Database profile name from config
+      --format=<option>  [default: table] Output format
+                         <options: table|json|toon>
 
 DESCRIPTION
   Show indexes for a MySQL table
@@ -307,10 +307,10 @@ DESCRIPTION
 EXAMPLES
   $ mq mysql indexes users
 
-  $ mq mysql indexes orders --format json --profile prod
+  $ mq mysql indexes orders --format json -p prod
 ```
 
-_See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/indexes.ts)_
+_See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/indexes.ts)_
 
 ## `mq mysql query QUERY`
 
@@ -318,16 +318,16 @@ Execute a SQL query against a MySQL database
 
 ```
 USAGE
-  $ mq mysql query QUERY [--format table|json|csv|toon] [--profile <value>] [--skip-confirmation]
+  $ mq mysql query QUERY [--format table|json|csv|toon] [-p <value>] [--skip-confirmation]
 
 ARGUMENTS
   QUERY  SQL query to execute
 
 FLAGS
-  --format=<option>    [default: table] Output format
-                       <options: table|json|csv|toon>
-  --profile=<value>    Database profile name from config
-  --skip-confirmation  Skip confirmation prompt for destructive operations
+  -p, --profile=<value>    Database profile name from config
+      --format=<option>    [default: table] Output format
+                           <options: table|json|csv|toon>
+      --skip-confirmation  Skip confirmation prompt for destructive operations
 
 DESCRIPTION
   Execute a SQL query against a MySQL database
@@ -337,10 +337,10 @@ EXAMPLES
 
   $ mq mysql query "UPDATE users SET email = 'user@email.com' WHERE id = 999" --format json
 
-  $ mq mysql query "DELETE FROM sessions" --profile prod --skip-confirmation
+  $ mq mysql query "DELETE FROM sessions" -p prod --skip-confirmation
 ```
 
-_See code: [src/commands/mysql/query.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/query.ts)_
+_See code: [src/commands/mysql/query.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/query.ts)_
 
 ## `mq mysql tables`
 
@@ -348,10 +348,10 @@ List all tables in the current MySQL database
 
 ```
 USAGE
-  $ mq mysql tables [--profile <value>]
+  $ mq mysql tables [-p <value>]
 
 FLAGS
-  --profile=<value>  Database profile name from config
+  -p, --profile=<value>  Database profile name from config
 
 DESCRIPTION
   List all tables in the current MySQL database
@@ -359,8 +359,8 @@ DESCRIPTION
 EXAMPLES
   $ mq mysql tables
 
-  $ mq mysql tables --profile local
+  $ mq mysql tables -p local
 ```
 
-_See code: [src/commands/mysql/tables.ts](https://github.com/hesedcasa/mysql/blob/v0.4.1/src/commands/mysql/tables.ts)_
+_See code: [src/commands/mysql/tables.ts](https://github.com/hesedcasa/mysql/blob/v0.5.0/src/commands/mysql/tables.ts)_
 <!-- commandsstop -->
