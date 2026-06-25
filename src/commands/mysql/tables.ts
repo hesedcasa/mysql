@@ -9,16 +9,20 @@ export default class MySQLTables extends Command {
     profile: Flags.string({char: 'p', description: 'Database profile name from config', required: false}),
   }
 
-  public async run(): Promise<void> {
+  public override jsonEnabled(): boolean {
+    return true
+  }
+
+  public async run(): Promise<string[]> {
     const {flags} = await this.parse(MySQLTables)
 
     const result = await listTables(this.config, flags.profile)
     await closeConnections()
 
     if (result.success) {
-      this.logJson(result.tables)
-    } else {
-      this.error(result.error ?? 'Failed to list tables')
+      return result.tables ?? []
     }
+
+    this.error(result.error ?? 'Failed to list tables')
   }
 }
