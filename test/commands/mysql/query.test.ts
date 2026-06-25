@@ -40,16 +40,48 @@ describe('mysql:query', () => {
   })
 
   it('uses provided --profile and --format flags', async () => {
+    executeQueryStub.resolves({result: '[{"1":1}]', success: true})
+
     const cmd = new MySQLQuery(['SELECT 1', '--profile', 'prod', '--format', 'json'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
     const logStub = stub(cmd, 'log')
 
-    await cmd.run()
+    const result = await cmd.run()
 
     expect(executeQueryStub.firstCall.args.slice(1)).to.deep.equal(['SELECT 1', 'prod', 'json', false])
-    expect(logStub.calledOnce).to.be.true
+    expect(logStub.notCalled).to.be.true
+    expect(result).to.deep.equal([{1: 1}])
+  })
+
+  it('enables JSON mode only for --format json', async () => {
+    const jsonCmd = new MySQLQuery(['SELECT 1', '--format', 'json'], {
+      root: process.cwd(),
+      runHook: stub().resolves({failures: [], successes: []}),
+    } as any)
+    const equalsJsonCmd = new MySQLQuery(['SELECT 1', '--format=json'], {
+      root: process.cwd(),
+      runHook: stub().resolves({failures: [], successes: []}),
+    } as any)
+    const tableCmd = new MySQLQuery(['SELECT 1', '--format', 'table'], {
+      root: process.cwd(),
+      runHook: stub().resolves({failures: [], successes: []}),
+    } as any)
+    const defaultCmd = new MySQLQuery(['SELECT 1'], {
+      root: process.cwd(),
+      runHook: stub().resolves({failures: [], successes: []}),
+    } as any)
+    const passthroughCmd = new MySQLQuery(['SELECT 1', '--', '--format', 'json'], {
+      root: process.cwd(),
+      runHook: stub().resolves({failures: [], successes: []}),
+    } as any)
+
+    expect(jsonCmd.jsonEnabled()).to.be.true
+    expect(equalsJsonCmd.jsonEnabled()).to.be.true
+    expect(tableCmd.jsonEnabled()).to.be.false
+    expect(defaultCmd.jsonEnabled()).to.be.false
+    expect(passthroughCmd.jsonEnabled()).to.be.false
   })
 
   it('passes --skip-confirmation flag to executeQuery', async () => {
