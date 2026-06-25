@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/hesedcasa/mysql/compare/v0.4.1...v0.5.0) (2026-06-25)
+
+
+### 🎉 Features
+
+* **query:** route notices to stderr for machine-readable formats ([#61](https://github.com/hesedcasa/mysql/issues/61)) ([b9237b5](https://github.com/hesedcasa/mysql/commit/b9237b5e81a070220fc056a616c89cbc6471ec3c))
+
 ## [0.4.1](https://github.com/hesedcasa/mysql/compare/v0.4.0...v0.4.1) (2026-06-05)
 
 
