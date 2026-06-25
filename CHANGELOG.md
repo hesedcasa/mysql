@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/hesedcasa/mysql/compare/v0.5.0...v0.5.1) (2026-06-25)
+
+
+### ♻️ Chores
+
+* introduce BaseCommand to centralize run() return and JSON ([#63](https://github.com/hesedcasa/mysql/issues/63)) ([0162ee6](https://github.com/hesedcasa/mysql/commit/0162ee6ab111212afde83b183849f54b9ae93d7e))
+
 ## [0.5.0](https://github.com/hesedcasa/mysql/compare/v0.4.1...v0.5.0) (2026-06-25)
 
 
