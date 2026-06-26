@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/hesedcasa/mysql/compare/v0.5.1...v0.5.2) (2026-06-26)
+
+
+### ♻️ Chores
+
+* migrate to ApiResult data wrapper, replace --format with --toon, rename explain-query to explain ([#65](https://github.com/hesedcasa/mysql/issues/65)) ([99f045b](https://github.com/hesedcasa/mysql/commit/99f045b64f9c4c14bf078d4dbae8dfaa869b8cd8))
+
 ## [0.5.1](https://github.com/hesedcasa/mysql/compare/v0.5.0...v0.5.1) (2026-06-25)
 
 
