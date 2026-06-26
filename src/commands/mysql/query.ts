@@ -41,7 +41,9 @@ export default class MySQLQuery extends BaseCommand {
       // leave stdout as clean, parseable data.
       if (result.data?.notices) this.logToStderr(result.data.notices)
 
-      this.log(result.data?.result ?? '')
+      // result is a formatted string for human/csv/toon output; for --json it
+      // holds the parsed payload, but jsonEnabled() suppresses log() in that case.
+      this.log(typeof result.data?.result === 'string' ? result.data.result : '')
 
       delete (result.data as QueryData).notices
 

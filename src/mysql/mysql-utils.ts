@@ -115,7 +115,7 @@ export class MySQLUtil implements DatabaseUtil {
         queryType === 'SELECT' || queryType === 'SHOW' || queryType === 'DESCRIBE' || queryType === 'EXPLAIN'
       let data = isRead
         ? this.formatReadResult(rows as RowDataPacket[], fields as FieldPacket[], format, notices)
-        : this.formatWriteResult(rows as OkPacket, notices)
+        : this.formatWriteResult(rows as OkPacket, notices, format)
 
       if (format === 'json') {
         data = JSON.parse(data)
@@ -272,10 +272,19 @@ export class MySQLUtil implements DatabaseUtil {
     return FORMATTERS[format](rows, fields)
   }
 
-  private formatWriteResult(rows: OkPacket, notices: string[]): string {
+  private formatWriteResult(rows: OkPacket, notices: string[], format: OutputFormat): string {
     const affectedRows = rows.affectedRows ?? 0
     const insertId = rows.insertId ?? null
     notices.push('Query executed successfully.')
+
+    // The caller JSON.parses the result for json output, so emit valid JSON
+    // here rather than the human-readable string (which would throw on parse).
+    if (format === 'json') {
+      const payload: {affectedRows: number; insertId?: number} = {affectedRows}
+      if (insertId) payload.insertId = insertId
+      return JSON.stringify(payload, null, 2)
+    }
+
     let data = `Affected rows: ${affectedRows}\n`
     if (insertId) data += `Insert ID: ${insertId}\n`
     return data

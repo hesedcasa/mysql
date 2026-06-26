@@ -6,7 +6,9 @@ export interface QueryData {
   message?: string
   notices?: string
   requiresConfirmation?: boolean
-  result?: string
+  // For machine formats (json), result is the parsed payload (object/array);
+  // for human output it is a formatted string. Typed as unknown to cover both.
+  result?: unknown
 }
 
 export interface DatabaseListData {
