@@ -26,7 +26,7 @@ $ npm install -g @hesed/mysql
 $ mq COMMAND
 running command...
 $ mq (--version)
-@hesed/mysql/0.5.1 darwin-arm64 node-v22.22.3
+@hesed/mysql/0.5.2 linux-x64 node-v22.23.0
 $ mq --help [COMMAND]
 USAGE
   $ mq COMMAND
@@ -56,17 +56,17 @@ Add MySQL authentication
 
 ```
 USAGE
-  $ mq mysql auth add [--json] [-p <value>] [--host <value>] [--port <value>] [-u <value>] [--password <value>] [-d
-    <value>] [--ssl]
+  $ mq mysql auth add -p <value> --host <value> --port <value> -u <value> --password <value> -d <value> --ssl
+    [--json]
 
 FLAGS
-  -d, --database=<value>  Database name
-  -p, --profile=<value>   Profile name
-  -u, --user=<value>      Username
-      --host=<value>      MySQL host
-      --password=<value>  Password
-      --port=<value>      MySQL port
-      --ssl               Use SSL
+  -d, --database=<value>  (required) Database name
+  -p, --profile=<value>   (required) Profile name
+  -u, --user=<value>      (required) Username
+      --host=<value>      (required) MySQL host
+      --password=<value>  (required) Password
+      --port=<value>      (required) MySQL port
+      --ssl               (required) Use SSL
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -80,7 +80,7 @@ EXAMPLES
   $ mq mysql auth add -p prod
 ```
 
-_See code: [src/commands/mysql/auth/add.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/auth/add.ts)_
+_See code: [src/commands/mysql/auth/add.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/auth/add.ts)_
 
 ## `mq mysql auth delete`
 
@@ -105,7 +105,7 @@ EXAMPLES
   $ mq mysql auth delete -p prod
 ```
 
-_See code: [src/commands/mysql/auth/delete.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/auth/delete.ts)_
+_See code: [src/commands/mysql/auth/delete.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/auth/delete.ts)_
 
 ## `mq mysql auth list`
 
@@ -125,7 +125,7 @@ EXAMPLES
   $ mq mysql auth list
 ```
 
-_See code: [src/commands/mysql/auth/list.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/auth/list.ts)_
+_See code: [src/commands/mysql/auth/list.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/auth/list.ts)_
 
 ## `mq mysql auth profile`
 
@@ -150,7 +150,7 @@ EXAMPLES
   $ mq mysql auth profile --default test
 ```
 
-_See code: [src/commands/mysql/auth/profile.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/auth/profile.ts)_
+_See code: [src/commands/mysql/auth/profile.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/auth/profile.ts)_
 
 ## `mq mysql auth test`
 
@@ -175,7 +175,7 @@ EXAMPLES
   $ mq mysql auth test -p prod
 ```
 
-_See code: [src/commands/mysql/auth/test.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/auth/test.ts)_
+_See code: [src/commands/mysql/auth/test.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/auth/test.ts)_
 
 ## `mq mysql auth update`
 
@@ -183,17 +183,17 @@ Update MySQL authentication
 
 ```
 USAGE
-  $ mq mysql auth update [--json] [-p <value>] [--host <value>] [--port <value>] [-u <value>] [--password <value>] [-d
-    <value>] [--ssl]
+  $ mq mysql auth update -p <value> --host <value> --port <value> -u <value> --password <value> -d <value> --ssl
+    [--json]
 
 FLAGS
-  -d, --database=<value>  Database name
-  -p, --profile=<value>   Profile name
-  -u, --user=<value>      Username
-      --host=<value>      MySQL host
-      --password=<value>  Password
-      --port=<value>      MySQL port
-      --ssl               Use SSL
+  -d, --database=<value>  (required) Database name
+  -p, --profile=<value>   (required) Profile name
+  -u, --user=<value>      (required) Username
+      --host=<value>      (required) MySQL host
+      --password=<value>  (required) Password
+      --port=<value>      (required) MySQL port
+      --ssl               (required) Use SSL
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -207,7 +207,7 @@ EXAMPLES
   $ mq mysql auth update -p test
 ```
 
-_See code: [src/commands/mysql/auth/update.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/auth/update.ts)_
+_See code: [src/commands/mysql/auth/update.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/auth/update.ts)_
 
 ## `mq mysql databases`
 
@@ -232,7 +232,7 @@ EXAMPLES
   $ mq mysql databases -p staging
 ```
 
-_See code: [src/commands/mysql/databases.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/databases.ts)_
+_See code: [src/commands/mysql/databases.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/databases.ts)_
 
 ## `mq mysql describe-table TABLE`
 
@@ -261,7 +261,7 @@ EXAMPLES
   $ mq mysql describe-table orders --toon -p prod
 ```
 
-_See code: [src/commands/mysql/describe-table.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/describe-table.ts)_
+_See code: [src/commands/mysql/describe-table.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/describe-table.ts)_
 
 ## `mq mysql explain QUERY`
 
@@ -290,7 +290,7 @@ EXAMPLES
   $ mq mysql explain "SELECT * FROM orders JOIN users ON orders.user_id = users.id" --json
 ```
 
-_See code: [src/commands/mysql/explain.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/explain.ts)_
+_See code: [src/commands/mysql/explain.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/explain.ts)_
 
 ## `mq mysql indexes TABLE`
 
@@ -319,7 +319,7 @@ EXAMPLES
   $ mq mysql indexes orders --json -p prod
 ```
 
-_See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/indexes.ts)_
+_See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/indexes.ts)_
 
 ## `mq mysql query QUERY`
 
@@ -351,7 +351,7 @@ EXAMPLES
   $ mq mysql query "DELETE FROM sessions" -p prod --skip-confirmation
 ```
 
-_See code: [src/commands/mysql/query.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/query.ts)_
+_See code: [src/commands/mysql/query.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/query.ts)_
 
 ## `mq mysql tables`
 
@@ -376,5 +376,5 @@ EXAMPLES
   $ mq mysql tables -p local
 ```
 
-_See code: [src/commands/mysql/tables.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/tables.ts)_
+_See code: [src/commands/mysql/tables.ts](https://github.com/hesedcasa/mysql/blob/v0.5.2/src/commands/mysql/tables.ts)_
 <!-- commandsstop -->
