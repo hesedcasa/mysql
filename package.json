@@ -49,7 +49,7 @@
   ],
   "homepage": "https://github.com/hesedcasa/mysql",
   "keywords": [
-    "oclif"
+    "mysql"
   ],
   "license": "Apache-2.0",
   "main": "dist/index.js",

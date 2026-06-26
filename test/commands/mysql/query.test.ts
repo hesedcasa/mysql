@@ -8,7 +8,10 @@ describe('mysql:query', () => {
   let executeQueryStub: SinonStub
   let closeConnectionsStub: SinonStub
 
-  const mockResult = {result: 'Query executed successfully. Rows returned: 2\n\nid | name\n1  | Alice', success: true}
+  const mockResult = {
+    data: {result: 'Query executed successfully. Rows returned: 2\n\nid | name\n1  | Alice'},
+    success: true,
+  }
 
   beforeEach(async () => {
     executeQueryStub = stub().resolves(mockResult)
@@ -36,35 +39,31 @@ describe('mysql:query', () => {
     expect(executeQueryStub.firstCall.args.slice(1)).to.deep.equal(['SELECT * FROM users', undefined, 'table', false])
     expect(closeConnectionsStub.calledOnce).to.be.true
     expect(logStub.calledOnce).to.be.true
-    expect(logStub.firstCall.args[0]).to.equal(mockResult.result)
+    expect(logStub.firstCall.args[0]).to.equal(mockResult.data.result)
   })
 
-  it('uses provided --profile and --format flags', async () => {
-    executeQueryStub.resolves({result: '[{"1":1}]', success: true})
+  it('uses provided --profile and --json flags', async () => {
+    executeQueryStub.resolves({data: {result: '[{"1":1}]'}, success: true})
 
-    const cmd = new MySQLQuery(['SELECT 1', '--profile', 'prod', '--format', 'json'], {
+    const cmd = new MySQLQuery(['SELECT 1', '--profile', 'prod', '--json'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
     const logStub = stub(cmd, 'log')
 
-    const result = await cmd.run()
+    await cmd.run()
 
     expect(executeQueryStub.firstCall.args.slice(1)).to.deep.equal(['SELECT 1', 'prod', 'json', false])
-    expect(logStub.notCalled).to.be.true
-    expect(result).to.deep.equal([{1: 1}])
+    expect(logStub.calledOnce).to.be.true
+    expect(logStub.firstCall.args[0]).to.equal('[{"1":1}]')
   })
 
-  it('enables JSON mode only for --format json', async () => {
-    const jsonCmd = new MySQLQuery(['SELECT 1', '--format', 'json'], {
+  it('enables JSON mode only for --json flag', async () => {
+    const jsonCmd = new MySQLQuery(['SELECT 1', '--json'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
-    const equalsJsonCmd = new MySQLQuery(['SELECT 1', '--format=json'], {
-      root: process.cwd(),
-      runHook: stub().resolves({failures: [], successes: []}),
-    } as any)
-    const tableCmd = new MySQLQuery(['SELECT 1', '--format', 'table'], {
+    const toonCmd = new MySQLQuery(['SELECT 1', '--toon'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
@@ -72,14 +71,13 @@ describe('mysql:query', () => {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
-    const passthroughCmd = new MySQLQuery(['SELECT 1', '--', '--format', 'json'], {
+    const passthroughCmd = new MySQLQuery(['SELECT 1', '--', '--json'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
 
     expect(jsonCmd.jsonEnabled()).to.be.true
-    expect(equalsJsonCmd.jsonEnabled()).to.be.true
-    expect(tableCmd.jsonEnabled()).to.be.false
+    expect(toonCmd.jsonEnabled()).to.be.false
     expect(defaultCmd.jsonEnabled()).to.be.false
     expect(passthroughCmd.jsonEnabled()).to.be.false
   })
@@ -97,7 +95,7 @@ describe('mysql:query', () => {
   })
 
   it('throws error when query fails', async () => {
-    executeQueryStub.resolves({error: 'ERROR: table not found', success: false})
+    executeQueryStub.resolves({data: undefined, error: 'ERROR: table not found', success: false})
 
     const cmd = new MySQLQuery(['SELECT * FROM nonexistent'], {
       root: process.cwd(),

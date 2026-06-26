@@ -1,6 +1,8 @@
+import {ApiResult} from '@hesed/plugin-lib'
 import {Args, Flags} from '@oclif/core'
 
 import {BaseCommand} from '../../base-command.js'
+import {ExplainData} from '../../mysql/database.js'
 import {closeConnections, explainQuery} from '../../mysql/index.js'
 
 export default class MySQLExplain extends BaseCommand {
@@ -10,28 +12,32 @@ export default class MySQLExplain extends BaseCommand {
   static override description = 'Show the execution plan for a MySQL query'
   static override examples = [
     '<%= config.bin %> <%= command.id %> "SELECT * FROM users WHERE id = 1"',
-    '<%= config.bin %> <%= command.id %> "SELECT * FROM orders JOIN users ON orders.user_id = users.id" --format json',
+    '<%= config.bin %> <%= command.id %> "SELECT * FROM orders JOIN users ON orders.user_id = users.id" --json',
   ]
   static override flags = {
-    format: Flags.string({
-      default: 'table',
-      description: 'Output format',
-      options: ['table', 'json', 'toon'],
-    }),
     profile: Flags.string({char: 'p', description: 'Database profile name from config', required: false}),
+    toon: Flags.boolean({description: 'Format output as toon', required: false}),
   }
 
-  public async run(): Promise<unknown> {
+  public async run(): Promise<ApiResult> {
     const {args, flags} = await this.parse(MySQLExplain)
 
-    const result = await explainQuery(this.config, args.query, flags.profile, flags.format as 'json' | 'table' | 'toon')
+    const result = await explainQuery(
+      this.config,
+      args.query,
+      flags.profile,
+      flags.toon ? 'toon' : flags.json ? 'json' : 'table',
+    )
     await closeConnections()
 
     if (result.success) {
-      this.log(result.result ?? '')
+      this.log(result.data?.result ?? '')
+
+      delete (result.data as ExplainData).result
+
       return result
     }
 
-    this.error(result.error ?? 'Failed to explain query')
+    this.error(String(result.error ?? 'Failed to explain query'))
   }
 }

@@ -43,8 +43,10 @@ export class MySQLUtil implements DatabaseUtil {
       const connection = await this.getConnection(profileName)
       const [rows, fields] = await connection.query(`DESCRIBE ${table}`)
       return {
-        result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
-        structure: rows as RowDataPacket[],
+        data: {
+          result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
+          structure: rows as RowDataPacket[],
+        },
         success: true,
       }
     } catch (error: unknown) {
@@ -74,8 +76,10 @@ export class MySQLUtil implements DatabaseUtil {
       const confirmationCheck = requiresConfirmation(query, this.config.safety.requireConfirmationFor)
       if (confirmationCheck.required) {
         return {
-          message: `${confirmationCheck.message}\nQuery: ${query}`,
-          requiresConfirmation: true,
+          data: {
+            message: `${confirmationCheck.message}\nQuery: ${query}`,
+            requiresConfirmation: true,
+          },
           success: false,
         }
       }
@@ -109,16 +113,22 @@ export class MySQLUtil implements DatabaseUtil {
 
       const isRead =
         queryType === 'SELECT' || queryType === 'SHOW' || queryType === 'DESCRIBE' || queryType === 'EXPLAIN'
-      const data = isRead
+      let data = isRead
         ? this.formatReadResult(rows as RowDataPacket[], fields as FieldPacket[], format, notices)
         : this.formatWriteResult(rows as OkPacket, notices)
+
+      if (format === 'json') {
+        data = JSON.parse(data)
+      }
 
       const notice = notices.join('\n\n')
       // For human (table) output everything stays on stdout, exactly as before.
       // For machine formats the data is returned alone and notices go to stderr.
       return {
-        notices: machineFormat ? notice : undefined,
-        result: machineFormat ? data : `${notice}\n\n${data}`,
+        data: {
+          notices: machineFormat ? notice : undefined,
+          result: machineFormat ? data : `${notice}\n\n${data}`,
+        },
         success: true,
       }
     } catch (error: unknown) {
@@ -139,8 +149,10 @@ export class MySQLUtil implements DatabaseUtil {
       const connection = await this.getConnection(profileName)
       const [rows, fields] = await connection.query(`EXPLAIN ${query}`)
       return {
-        plan: rows as RowDataPacket[],
-        result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
+        data: {
+          plan: rows as RowDataPacket[],
+          result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
+        },
         success: true,
       }
     } catch (error: unknown) {
@@ -158,8 +170,10 @@ export class MySQLUtil implements DatabaseUtil {
       const [rows] = await connection.query('SHOW DATABASES')
       const databases = (rows as RowDataPacket[]).map((row) => row.Database as string)
       return {
-        databases,
-        result: `Databases:\n${databases.map((db) => `  • ${db}`).join('\n')}`,
+        data: {
+          databases,
+          result: `Databases:\n${databases.map((db) => `  • ${db}`).join('\n')}`,
+        },
         success: true,
       }
     } catch (error: unknown) {
@@ -181,9 +195,11 @@ export class MySQLUtil implements DatabaseUtil {
       const tables = rowsArray.map((row) => row[tableKey] as string)
 
       return {
-        result: `Tables in database:\n${tables.map((table) => `  • ${table}`).join('\n')}`,
+        data: {
+          result: `Tables in database:\n${tables.map((table) => `  • ${table}`).join('\n')}`,
+          tables,
+        },
         success: true,
-        tables,
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -203,8 +219,10 @@ export class MySQLUtil implements DatabaseUtil {
       const connection = await this.getConnection(profileName)
       const [rows, fields] = await connection.query(`SHOW INDEXES FROM ${table}`)
       return {
-        indexes: rows as RowDataPacket[],
-        result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
+        data: {
+          indexes: rows as RowDataPacket[],
+          result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
+        },
         success: true,
       }
     } catch (error: unknown) {
@@ -223,10 +241,12 @@ export class MySQLUtil implements DatabaseUtil {
 
       const info = (rows as RowDataPacket[])[0]
       return {
-        database: info.current_database as string,
-        result: `Connection successful!\n\nProfile: ${profileName}\nMySQL Version: ${info.version}\nCurrent Database: ${info.current_database}`,
+        data: {
+          database: info.current_database as string,
+          result: `Connection successful!\n\nProfile: ${profileName}\nMySQL Version: ${info.version}\nCurrent Database: ${info.current_database}`,
+          version: info.version as string,
+        },
         success: true,
-        version: info.version as string,
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
