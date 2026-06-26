@@ -26,7 +26,7 @@ $ npm install -g @hesed/mysql
 $ mq COMMAND
 running command...
 $ mq (--version)
-@hesed/mysql/0.5.1 linux-x64 node-v22.23.0
+@hesed/mysql/0.5.1 darwin-arm64 node-v22.22.3
 $ mq --help [COMMAND]
 USAGE
   $ mq COMMAND
@@ -45,7 +45,7 @@ USAGE
 * [`mq mysql auth update`](#mq-mysql-auth-update)
 * [`mq mysql databases`](#mq-mysql-databases)
 * [`mq mysql describe-table TABLE`](#mq-mysql-describe-table-table)
-* [`mq mysql explain-query QUERY`](#mq-mysql-explain-query-query)
+* [`mq mysql explain QUERY`](#mq-mysql-explain-query)
 * [`mq mysql indexes TABLE`](#mq-mysql-indexes-table)
 * [`mq mysql query QUERY`](#mq-mysql-query-query)
 * [`mq mysql tables`](#mq-mysql-tables)
@@ -56,17 +56,17 @@ Add MySQL authentication
 
 ```
 USAGE
-  $ mq mysql auth add -p <value> --host <value> --port <value> -u <value> --password <value> -d <value> --ssl
-    [--json]
+  $ mq mysql auth add [--json] [-p <value>] [--host <value>] [--port <value>] [-u <value>] [--password <value>] [-d
+    <value>] [--ssl]
 
 FLAGS
-  -d, --database=<value>  (required) Database name
-  -p, --profile=<value>   (required) Profile name
-  -u, --user=<value>      (required) Username
-      --host=<value>      (required) MySQL host
-      --password=<value>  (required) Password
-      --port=<value>      (required) MySQL port
-      --ssl               (required) Use SSL
+  -d, --database=<value>  Database name
+  -p, --profile=<value>   Profile name
+  -u, --user=<value>      Username
+      --host=<value>      MySQL host
+      --password=<value>  Password
+      --port=<value>      MySQL port
+      --ssl               Use SSL
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -183,17 +183,17 @@ Update MySQL authentication
 
 ```
 USAGE
-  $ mq mysql auth update -p <value> --host <value> --port <value> -u <value> --password <value> -d <value> --ssl
-    [--json]
+  $ mq mysql auth update [--json] [-p <value>] [--host <value>] [--port <value>] [-u <value>] [--password <value>] [-d
+    <value>] [--ssl]
 
 FLAGS
-  -d, --database=<value>  (required) Database name
-  -p, --profile=<value>   (required) Profile name
-  -u, --user=<value>      (required) Username
-      --host=<value>      (required) MySQL host
-      --password=<value>  (required) Password
-      --port=<value>      (required) MySQL port
-      --ssl               (required) Use SSL
+  -d, --database=<value>  Database name
+  -p, --profile=<value>   Profile name
+  -u, --user=<value>      Username
+      --host=<value>      MySQL host
+      --password=<value>  Password
+      --port=<value>      MySQL port
+      --ssl               Use SSL
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -240,15 +240,14 @@ Describe the structure of a MySQL table
 
 ```
 USAGE
-  $ mq mysql describe-table TABLE [--json] [--format table|json|toon] [-p <value>]
+  $ mq mysql describe-table TABLE [--json] [-p <value>] [--toon]
 
 ARGUMENTS
   TABLE  Table name to describe
 
 FLAGS
   -p, --profile=<value>  Database profile name from config
-      --format=<option>  [default: table] Output format
-                         <options: table|json|toon>
+      --toon             Format output as toon
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -259,26 +258,25 @@ DESCRIPTION
 EXAMPLES
   $ mq mysql describe-table users
 
-  $ mq mysql describe-table orders --format json -p prod
+  $ mq mysql describe-table orders --toon -p prod
 ```
 
 _See code: [src/commands/mysql/describe-table.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/describe-table.ts)_
 
-## `mq mysql explain-query QUERY`
+## `mq mysql explain QUERY`
 
 Show the execution plan for a MySQL query
 
 ```
 USAGE
-  $ mq mysql explain-query QUERY [--json] [--format table|json|toon] [-p <value>]
+  $ mq mysql explain QUERY [--json] [-p <value>] [--toon]
 
 ARGUMENTS
   QUERY  SQL query to explain
 
 FLAGS
   -p, --profile=<value>  Database profile name from config
-      --format=<option>  [default: table] Output format
-                         <options: table|json|toon>
+      --toon             Format output as toon
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -287,12 +285,12 @@ DESCRIPTION
   Show the execution plan for a MySQL query
 
 EXAMPLES
-  $ mq mysql explain-query "SELECT * FROM users WHERE id = 1"
+  $ mq mysql explain "SELECT * FROM users WHERE id = 1"
 
-  $ mq mysql explain-query "SELECT * FROM orders JOIN users ON orders.user_id = users.id" --format json
+  $ mq mysql explain "SELECT * FROM orders JOIN users ON orders.user_id = users.id" --json
 ```
 
-_See code: [src/commands/mysql/explain-query.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/explain-query.ts)_
+_See code: [src/commands/mysql/explain.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/explain.ts)_
 
 ## `mq mysql indexes TABLE`
 
@@ -300,15 +298,14 @@ Show indexes for a MySQL table
 
 ```
 USAGE
-  $ mq mysql indexes TABLE [--json] [--format table|json|toon] [-p <value>]
+  $ mq mysql indexes TABLE [--json] [-p <value>] [--toon]
 
 ARGUMENTS
   TABLE  Table name to show indexes for
 
 FLAGS
   -p, --profile=<value>  Database profile name from config
-      --format=<option>  [default: table] Output format
-                         <options: table|json|toon>
+      --toon             Format output as toon
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -319,7 +316,7 @@ DESCRIPTION
 EXAMPLES
   $ mq mysql indexes users
 
-  $ mq mysql indexes orders --format json -p prod
+  $ mq mysql indexes orders --json -p prod
 ```
 
 _See code: [src/commands/mysql/indexes.ts](https://github.com/hesedcasa/mysql/blob/v0.5.1/src/commands/mysql/indexes.ts)_
@@ -330,16 +327,15 @@ Execute a SQL query against a MySQL database
 
 ```
 USAGE
-  $ mq mysql query QUERY [--json] [--format table|json|csv|toon] [-p <value>] [--skip-confirmation]
+  $ mq mysql query QUERY [--json] [-p <value>] [--skip-confirmation] [--toon]
 
 ARGUMENTS
   QUERY  SQL query to execute
 
 FLAGS
   -p, --profile=<value>    Database profile name from config
-      --format=<option>    [default: table] Output format
-                           <options: table|json|csv|toon>
       --skip-confirmation  Skip confirmation prompt for destructive operations
+      --toon               Format output as toon
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -348,9 +344,9 @@ DESCRIPTION
   Execute a SQL query against a MySQL database
 
 EXAMPLES
-  $ mq mysql query "SELECT * FROM users LIMIT 10"
+  $ mq mysql query "SELECT * FROM users LIMIT 10" --json
 
-  $ mq mysql query "UPDATE users SET email = 'user@email.com' WHERE id = 999" --format json
+  $ mq mysql query "UPDATE users SET email = 'user@email.com' WHERE id = 999"
 
   $ mq mysql query "DELETE FROM sessions" -p prod --skip-confirmation
 ```
@@ -363,10 +359,13 @@ List all tables in the current MySQL database
 
 ```
 USAGE
-  $ mq mysql tables [-p <value>]
+  $ mq mysql tables [--json] [-p <value>]
 
 FLAGS
   -p, --profile=<value>  Database profile name from config
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   List all tables in the current MySQL database

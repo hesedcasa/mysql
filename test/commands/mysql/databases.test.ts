@@ -8,7 +8,10 @@ describe('mysql:databases', () => {
   let listDatabasesStub: SinonStub
   let closeConnectionsStub: SinonStub
 
-  const mockResult = {databases: ['mydb', 'testdb'], result: 'Databases:\n  • mydb\n  • testdb', success: true}
+  const mockResult = {
+    data: {databases: ['mydb', 'testdb'], result: 'Databases:\n  • mydb\n  • testdb'},
+    success: true,
+  }
 
   beforeEach(async () => {
     listDatabasesStub = stub().resolves(mockResult)
@@ -23,7 +26,7 @@ describe('mysql:databases', () => {
     MySQLListDatabases = imported.default
   })
 
-  it('lists databases using default profile and logs result', async () => {
+  it('lists databases using default profile and returns result', async () => {
     const cmd = new MySQLListDatabases([], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
@@ -34,7 +37,7 @@ describe('mysql:databases', () => {
     expect(listDatabasesStub.calledOnce).to.be.true
     expect(listDatabasesStub.firstCall.args[1]).to.be.undefined
     expect(closeConnectionsStub.calledOnce).to.be.true
-    expect(result).to.deep.equal(mockResult.databases)
+    expect(result).to.deep.equal(mockResult)
   })
 
   it('uses provided --profile flag', async () => {

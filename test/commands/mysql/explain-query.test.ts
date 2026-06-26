@@ -9,8 +9,7 @@ describe('mysql:explain-query', () => {
   let closeConnectionsStub: SinonStub
 
   const mockResult = {
-    plan: [],
-    result: '┌──────┬────────────┐\n│ type │ table      │\n└──────┴────────────┘',
+    data: {plan: [], result: '┌──────┬────────────┐\n│ type │ table      │\n└──────┴────────────┘'},
     success: true,
   }
 
@@ -18,7 +17,7 @@ describe('mysql:explain-query', () => {
     explainQueryStub = stub().resolves(mockResult)
     closeConnectionsStub = stub().resolves()
 
-    const imported = await esmock('../../../src/commands/mysql/explain-query.js', {
+    const imported = await esmock('../../../src/commands/mysql/explain.js', {
       '../../../src/mysql/index.js': {
         closeConnections: closeConnectionsStub,
         explainQuery: explainQueryStub,
@@ -33,6 +32,7 @@ describe('mysql:explain-query', () => {
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
     const logStub = stub(cmd, 'log')
+    const expectedResult = mockResult.data.result
 
     await cmd.run()
 
@@ -44,11 +44,11 @@ describe('mysql:explain-query', () => {
     ])
     expect(closeConnectionsStub.calledOnce).to.be.true
     expect(logStub.calledOnce).to.be.true
-    expect(logStub.firstCall.args[0]).to.equal(mockResult.result)
+    expect(logStub.firstCall.args[0]).to.equal(expectedResult)
   })
 
   it('uses provided flags', async () => {
-    const cmd = new MySQLExplainQuery(['SELECT 1', '--profile', 'prod', '--format', 'json'], {
+    const cmd = new MySQLExplainQuery(['SELECT 1', '--profile', 'prod', '--json'], {
       root: process.cwd(),
       runHook: stub().resolves({failures: [], successes: []}),
     } as any)
