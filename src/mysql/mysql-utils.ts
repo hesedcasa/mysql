@@ -19,13 +19,22 @@ import {getMySQLConnectionOptions} from './config-loader.js'
 import {FORMATTERS} from './formatters.js'
 import {analyzeQuery, applyDefaultLimit, checkBlacklist, getQueryType, requiresConfirmation} from './query-validator.js'
 
+const DEFAULT_MAX_CONCURRENT_QUERIES = 5
+
+interface QuerySlotState {
+  active: number
+  waiting: Array<() => void>
+}
+
 export class MySQLUtil implements DatabaseUtil {
   private config: MySQLConfig
   private connections: Map<string, Promise<Connection>>
+  private querySlots: Map<string, QuerySlotState>
 
   constructor(config: MySQLConfig) {
     this.config = config
     this.connections = new Map()
+    this.querySlots = new Map()
   }
 
   async closeAll(): Promise<void> {
@@ -40,8 +49,7 @@ export class MySQLUtil implements DatabaseUtil {
     format: 'json' | 'table' | 'toon' = 'table',
   ): Promise<TableStructureResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows, fields] = await connection.query(`DESCRIBE ${table}`)
+      const [rows, fields] = await this.runQuery(profileName, `DESCRIBE ${table}`)
       return {
         data: {
           result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
@@ -108,8 +116,7 @@ export class MySQLUtil implements DatabaseUtil {
     }
 
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows, fields] = await connection.query(finalQuery)
+      const [rows, fields] = await this.runQuery(profileName, finalQuery)
 
       const isRead =
         queryType === 'SELECT' || queryType === 'SHOW' || queryType === 'DESCRIBE' || queryType === 'EXPLAIN'
@@ -146,8 +153,7 @@ export class MySQLUtil implements DatabaseUtil {
     format: 'json' | 'table' | 'toon' = 'table',
   ): Promise<ExplainResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows, fields] = await connection.query(`EXPLAIN ${query}`)
+      const [rows, fields] = await this.runQuery(profileName, `EXPLAIN ${query}`)
       return {
         data: {
           plan: rows as RowDataPacket[],
@@ -166,8 +172,7 @@ export class MySQLUtil implements DatabaseUtil {
 
   async listDatabases(profileName: string): Promise<DatabaseListResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows] = await connection.query('SHOW DATABASES')
+      const [rows] = await this.runQuery(profileName, 'SHOW DATABASES')
       const databases = (rows as RowDataPacket[]).map((row) => row.Database as string)
       return {
         data: {
@@ -187,8 +192,7 @@ export class MySQLUtil implements DatabaseUtil {
 
   async listTables(profileName: string): Promise<TableListResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows] = await connection.query('SHOW TABLES')
+      const [rows] = await this.runQuery(profileName, 'SHOW TABLES')
 
       const rowsArray = rows as RowDataPacket[]
       const tableKey = Object.keys(rowsArray[0])[0]
@@ -216,8 +220,7 @@ export class MySQLUtil implements DatabaseUtil {
     format: 'json' | 'table' | 'toon' = 'table',
   ): Promise<IndexResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows, fields] = await connection.query(`SHOW INDEXES FROM ${table}`)
+      const [rows, fields] = await this.runQuery(profileName, `SHOW INDEXES FROM ${table}`)
       return {
         data: {
           indexes: rows as RowDataPacket[],
@@ -236,8 +239,7 @@ export class MySQLUtil implements DatabaseUtil {
 
   async testConnection(profileName: string): Promise<ConnectionTestResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows] = await connection.query('SELECT VERSION() as version, DATABASE() as current_database')
+      const [rows] = await this.runQuery(profileName, 'SELECT VERSION() as version, DATABASE() as current_database')
 
       const info = (rows as RowDataPacket[])[0]
       return {
@@ -255,6 +257,36 @@ export class MySQLUtil implements DatabaseUtil {
         success: false,
       }
     }
+  }
+
+  // Grants a query slot for the profile, or waits until one frees up. The
+  // returned release callback must be invoked exactly once per acquisition.
+  private acquireQuerySlot(profileName: string): Promise<() => void> {
+    const limit = this.config.safety.maxConcurrentQueries ?? DEFAULT_MAX_CONCURRENT_QUERIES
+    let slot = this.querySlots.get(profileName)
+    if (!slot) {
+      slot = {active: 0, waiting: []}
+      this.querySlots.set(profileName, slot)
+    }
+
+    const state = slot
+    const release = () => {
+      const next = state.waiting.shift()
+      if (next) {
+        next()
+      } else {
+        state.active -= 1
+      }
+    }
+
+    if (state.active < limit) {
+      state.active += 1
+      return Promise.resolve(release)
+    }
+
+    return new Promise((resolve) => {
+      state.waiting.push(() => resolve(release))
+    })
   }
 
   private formatReadResult(
@@ -310,6 +342,18 @@ export class MySQLUtil implements DatabaseUtil {
     } catch (error) {
       this.connections.delete(profileName)
       throw error
+    }
+  }
+
+  // All queries go through here so concurrent load on the same profile is
+  // capped at maxConcurrentQueries; excess queries wait for a free slot.
+  private async runQuery(profileName: string, sql: string): Promise<[OkPacket | RowDataPacket[], FieldPacket[]]> {
+    const release = await this.acquireQuerySlot(profileName)
+    try {
+      const connection = await this.getConnection(profileName)
+      return (await connection.query(sql)) as [OkPacket | RowDataPacket[], FieldPacket[]]
+    } finally {
+      release()
     }
   }
 }

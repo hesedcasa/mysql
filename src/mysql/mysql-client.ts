@@ -22,6 +22,7 @@ let cachedConfig: MySQLConfig | null = null
 const DEFAULT_SAFETY_CONFIG = {
   blacklistedOperations: ['DROP DATABASE'],
   defaultLimit: 100,
+  maxConcurrentQueries: 5,
   requireConfirmationFor: ['DELETE', 'UPDATE', 'DROP', 'TRUNCATE', 'ALTER'],
 }
 

@@ -3,6 +3,11 @@ import {expect} from 'chai'
 import esmock from 'esmock'
 import {type SinonStub, stub} from 'sinon'
 
+const flushMicrotasks = async () =>
+  new Promise((resolve) => {
+    setImmediate(resolve)
+  })
+
 describe('mysql-utils: MySQLUtil', () => {
   let MySQLUtil: any
   let createConnectionStub: SinonStub
@@ -93,6 +98,89 @@ describe('mysql-utils: MySQLUtil', () => {
 
       expect(result.success).to.be.true
       expect(result.data?.result).to.include('Affected rows: 3')
+    })
+  })
+
+  describe('concurrency limit', () => {
+    const limitedConfig = {
+      ...mockConfig,
+      safety: {...mockConfig.safety, maxConcurrentQueries: 2},
+    }
+
+    it('queues queries beyond the limit until a running query finishes', async () => {
+      const resolvers: Array<(value: unknown) => void> = []
+      mockConnection.query.callsFake(
+        async () =>
+          new Promise((resolve) => {
+            resolvers.push(resolve)
+          }),
+      )
+
+      const util = new MySQLUtil(limitedConfig)
+      const first = util.listDatabases('local')
+      const second = util.listDatabases('local')
+      const third = util.listDatabases('local')
+
+      await flushMicrotasks()
+      expect(mockConnection.query.callCount).to.equal(2)
+
+      resolvers[0]([[{Database: 'mydb'}], []])
+      await first
+      await flushMicrotasks()
+      expect(mockConnection.query.callCount).to.equal(3)
+
+      resolvers[1]([[{Database: 'mydb'}], []])
+      resolvers[2]([[{Database: 'mydb'}], []])
+      const [secondResult, thirdResult] = await Promise.all([second, third])
+      expect(secondResult.success).to.be.true
+      expect(thirdResult.success).to.be.true
+    })
+
+    it('frees the slot when a query fails so waiting queries still run', async () => {
+      mockConnection.query.onFirstCall().rejects(new Error('boom'))
+      mockConnection.query.onSecondCall().resolves([[{Database: 'mydb'}], []])
+
+      const util = new MySQLUtil({...mockConfig, safety: {...mockConfig.safety, maxConcurrentQueries: 1}})
+      const [failed, succeeded] = await Promise.all([util.listDatabases('local'), util.listDatabases('local')])
+
+      expect(failed.success).to.be.false
+      expect(failed.error).to.include('boom')
+      expect(succeeded.success).to.be.true
+    })
+
+    it('tracks limits per profile independently', async () => {
+      const resolvers: Array<(value: unknown) => void> = []
+      mockConnection.query.callsFake(
+        async () =>
+          new Promise((resolve) => {
+            resolvers.push(resolve)
+          }),
+      )
+
+      const config = {
+        ...limitedConfig,
+        profiles: {
+          ...limitedConfig.profiles,
+          other: {database: 'otherdb', host: 'localhost', password: 'secret', port: 3306, user: 'root'},
+        },
+        safety: {...limitedConfig.safety, maxConcurrentQueries: 1},
+      }
+      const util = new MySQLUtil(config)
+      const local1 = util.listDatabases('local')
+      const local2 = util.listDatabases('local')
+      const other = util.listDatabases('other')
+
+      await flushMicrotasks()
+      // One slot per profile: local1 and other run, local2 waits.
+      expect(mockConnection.query.callCount).to.equal(2)
+
+      for (const resolve of resolvers) resolve([[{Database: 'mydb'}], []])
+      await Promise.all([local1, other])
+      await flushMicrotasks()
+      expect(mockConnection.query.callCount).to.equal(3)
+
+      resolvers[2]([[{Database: 'mydb'}], []])
+      await local2
     })
   })
 

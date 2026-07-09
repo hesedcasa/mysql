@@ -12,6 +12,7 @@ export interface DatabaseProfile {
 interface SafetyConfig {
   blacklistedOperations: string[]
   defaultLimit: number
+  maxConcurrentQueries?: number
   requireConfirmationFor: string[]
 }
 
