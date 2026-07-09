@@ -148,6 +148,38 @@ describe('mysql-utils: MySQLUtil', () => {
       expect(succeeded.success).to.be.true
     })
 
+    it('prefers the profile-level maxConcurrentQueries over the safety default', async () => {
+      const resolvers: Array<(value: unknown) => void> = []
+      mockConnection.query.callsFake(
+        async () =>
+          new Promise((resolve) => {
+            resolvers.push(resolve)
+          }),
+      )
+
+      // Safety allows 2, but the profile itself only allows 1.
+      const config = {
+        ...limitedConfig,
+        profiles: {
+          local: {...limitedConfig.profiles.local, maxConcurrentQueries: 1},
+        },
+      }
+      const util = new MySQLUtil(config)
+      const first = util.listDatabases('local')
+      const second = util.listDatabases('local')
+
+      await flushMicrotasks()
+      expect(mockConnection.query.callCount).to.equal(1)
+
+      resolvers[0]([[{Database: 'mydb'}], []])
+      await first
+      await flushMicrotasks()
+      expect(mockConnection.query.callCount).to.equal(2)
+
+      resolvers[1]([[{Database: 'mydb'}], []])
+      await second
+    })
+
     it('tracks limits per profile independently', async () => {
       const resolvers: Array<(value: unknown) => void> = []
       mockConnection.query.callsFake(

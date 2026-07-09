@@ -262,7 +262,12 @@ export class MySQLUtil implements DatabaseUtil {
   // Grants a query slot for the profile, or waits until one frees up. The
   // returned release callback must be invoked exactly once per acquisition.
   private acquireQuerySlot(profileName: string): Promise<() => void> {
-    const limit = this.config.safety.maxConcurrentQueries ?? DEFAULT_MAX_CONCURRENT_QUERIES
+    const configuredLimit =
+      this.config.profiles[profileName]?.maxConcurrentQueries ??
+      this.config.safety.maxConcurrentQueries ??
+      DEFAULT_MAX_CONCURRENT_QUERIES
+    // A limit below 1 would leave every query waiting forever.
+    const limit = Math.max(1, configuredLimit)
     let slot = this.querySlots.get(profileName)
     if (!slot) {
       slot = {active: 0, waiting: []}

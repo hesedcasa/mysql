@@ -9,6 +9,13 @@ const fields: FieldDef[] = [
   {description: 'Password', name: 'password', type: 'string'},
   {char: 'd', description: 'Database name', name: 'database', type: 'string'},
   {default: false, description: 'Use SSL', name: 'ssl', required: false, type: 'boolean'},
+  {
+    default: 5,
+    description: 'Max concurrent queries for this profile',
+    name: 'maxConcurrentQueries',
+    required: false,
+    type: 'number',
+  },
 ]
 
 export default createAuthAddCommand({

@@ -128,13 +128,16 @@ Stored at `~/.config/mysql/mysql-config.json` (multi-profile format):
       "user": "root",
       "password": "secret",
       "database": "mydb",
-      "ssl": false
+      "ssl": false,
+      "maxConcurrentQueries": 5
     }
   }
 }
 ```
 
 Auth commands (`mq mysql auth add/test/update`) manage this file. `auth add` creates the file with mode `0o600`.
+
+`maxConcurrentQueries` (optional, default 5) caps concurrent queries per profile — queries beyond the cap wait until a running query finishes.
 
 ## Testing
 

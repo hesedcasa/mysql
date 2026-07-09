@@ -3,6 +3,7 @@ import type {ConnectionOptions as MySQL2ConnectionOptions} from 'mysql2/promise'
 export interface DatabaseProfile {
   database: string
   host: string
+  maxConcurrentQueries?: number
   password: string
   port: number
   ssl?: boolean
