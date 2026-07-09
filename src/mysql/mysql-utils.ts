@@ -21,9 +21,14 @@ import {analyzeQuery, applyDefaultLimit, checkBlacklist, getQueryType, requiresC
 
 const DEFAULT_MAX_CONCURRENT_QUERIES = 5
 
+interface QueryWaiter {
+  grant: () => void
+  reject: (error: Error) => void
+}
+
 interface QuerySlotState {
   active: number
-  waiting: Array<() => void>
+  waiting: QueryWaiter[]
 }
 
 export class MySQLUtil implements DatabaseUtil {
@@ -38,6 +43,15 @@ export class MySQLUtil implements DatabaseUtil {
   }
 
   async closeAll(): Promise<void> {
+    // Reject queued queries first so nothing waits forever on a closed util.
+    for (const slot of this.querySlots.values()) {
+      for (const waiter of slot.waiting.splice(0)) {
+        waiter.reject(new Error('Connections were closed while the query was waiting for a free slot'))
+      }
+    }
+
+    this.querySlots.clear()
+
     const entries = [...this.connections.values()]
     this.connections.clear()
     await Promise.allSettled(entries.map(async (connPromise) => (await connPromise).end()))
@@ -278,7 +292,7 @@ export class MySQLUtil implements DatabaseUtil {
     const release = () => {
       const next = state.waiting.shift()
       if (next) {
-        next()
+        next.grant()
       } else {
         state.active -= 1
       }
@@ -289,8 +303,8 @@ export class MySQLUtil implements DatabaseUtil {
       return Promise.resolve(release)
     }
 
-    return new Promise((resolve) => {
-      state.waiting.push(() => resolve(release))
+    return new Promise((resolve, reject) => {
+      state.waiting.push({grant: () => resolve(release), reject})
     })
   }
 

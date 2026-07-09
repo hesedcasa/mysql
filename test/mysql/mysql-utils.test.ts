@@ -148,6 +148,33 @@ describe('mysql-utils: MySQLUtil', () => {
       expect(succeeded.success).to.be.true
     })
 
+    it('rejects queued queries when closeAll is called', async () => {
+      const resolvers: Array<(value: unknown) => void> = []
+      mockConnection.query.callsFake(
+        async () =>
+          new Promise((resolve) => {
+            resolvers.push(resolve)
+          }),
+      )
+
+      const util = new MySQLUtil({...mockConfig, safety: {...mockConfig.safety, maxConcurrentQueries: 1}})
+      const running = util.listDatabases('local')
+      const queued = util.listDatabases('local')
+
+      await flushMicrotasks()
+      expect(mockConnection.query.callCount).to.equal(1)
+
+      await util.closeAll()
+
+      const queuedResult = await queued
+      expect(queuedResult.success).to.be.false
+      expect(queuedResult.error).to.include('closed while the query was waiting')
+
+      resolvers[0]([[{Database: 'mydb'}], []])
+      const runningResult = await running
+      expect(runningResult.success).to.be.true
+    })
+
     it('prefers the profile-level maxConcurrentQueries over the safety default', async () => {
       const resolvers: Array<(value: unknown) => void> = []
       mockConnection.query.callsFake(
