@@ -40,7 +40,7 @@ src/
 │   ├── tables.ts
 │   ├── describe-table.ts
 │   ├── indexes.ts
-│   └── explain-query.ts
+│   └── explain.ts
 ├── mysql/               # MySQL interaction layer
 │   ├── mysql-client.ts  # Singleton client + exported functions (setConfigDir, getMySQLConfig, executeQuery, etc.)
 │   ├── mysql-utils.ts   # MySQLUtil class — connection pooling, formatting, safety enforcement
@@ -165,7 +165,7 @@ stub(cmd, 'log')
 await cmd.run()
 ```
 
-**MySQL layer tests** (`test/mysql/mysql-utils.test.ts`) — stub `mysql.createConnection` directly.
+**MySQL layer tests** (`test/mysql/mysql-utils.test.ts`) — stub `mysql.createPool` directly.
 
 **Auth command tests** — mock `@inquirer/prompts` input function in `beforeEach` to avoid blocking on stdin:
 

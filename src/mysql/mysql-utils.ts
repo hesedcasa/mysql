@@ -1,4 +1,4 @@
-import type {Connection, FieldPacket, OkPacket, RowDataPacket} from 'mysql2/promise'
+import type {FieldPacket, OkPacket, Pool, RowDataPacket} from 'mysql2/promise'
 
 import mysql from 'mysql2/promise'
 
@@ -33,12 +33,12 @@ interface QuerySlotState {
 
 export class MySQLUtil implements DatabaseUtil {
   private config: MySQLConfig
-  private connections: Map<string, Promise<Connection>>
+  private pools: Map<string, Pool>
   private querySlots: Map<string, QuerySlotState>
 
   constructor(config: MySQLConfig) {
     this.config = config
-    this.connections = new Map()
+    this.pools = new Map()
     this.querySlots = new Map()
   }
 
@@ -52,9 +52,9 @@ export class MySQLUtil implements DatabaseUtil {
 
     this.querySlots.clear()
 
-    const entries = [...this.connections.values()]
-    this.connections.clear()
-    await Promise.allSettled(entries.map(async (connPromise) => (await connPromise).end()))
+    const pools = [...this.pools.values()]
+    this.pools.clear()
+    await Promise.allSettled(pools.map((pool) => pool.end()))
   }
 
   async describeTable(
@@ -276,12 +276,7 @@ export class MySQLUtil implements DatabaseUtil {
   // Grants a query slot for the profile, or waits until one frees up. The
   // returned release callback must be invoked exactly once per acquisition.
   private acquireQuerySlot(profileName: string): Promise<() => void> {
-    const configuredLimit =
-      this.config.profiles[profileName]?.maxConcurrentQueries ??
-      this.config.safety.maxConcurrentQueries ??
-      DEFAULT_MAX_CONCURRENT_QUERIES
-    // A limit below 1 would leave every query waiting forever.
-    const limit = Math.max(1, configuredLimit)
+    const limit = this.getQueryLimit(profileName)
     let slot = this.querySlots.get(profileName)
     if (!slot) {
       slot = {active: 0, waiting: []}
@@ -341,27 +336,29 @@ export class MySQLUtil implements DatabaseUtil {
     return data
   }
 
-  private async getConnection(profileName: string): Promise<Connection> {
-    const existing = this.connections.get(profileName)
-    if (existing) {
-      try {
-        const conn = await existing
-        await conn.ping()
-        return conn
-      } catch {
-        this.connections.delete(profileName)
-      }
-    }
+  // The pool is sized to the profile's query limit so slot holders each get a
+  // real physical connection — a single Connection would serialize commands on
+  // the wire and make the concurrency limit meaningless.
+  private getPool(profileName: string): Pool {
+    const existing = this.pools.get(profileName)
+    if (existing) return existing
 
-    const connPromise = mysql.createConnection(getMySQLConnectionOptions(this.config, profileName))
-    this.connections.set(profileName, connPromise)
+    const pool = mysql.createPool({
+      ...getMySQLConnectionOptions(this.config, profileName),
+      connectionLimit: this.getQueryLimit(profileName),
+      waitForConnections: true,
+    })
+    this.pools.set(profileName, pool)
+    return pool
+  }
 
-    try {
-      return await connPromise
-    } catch (error) {
-      this.connections.delete(profileName)
-      throw error
-    }
+  private getQueryLimit(profileName: string): number {
+    const configuredLimit =
+      this.config.profiles[profileName]?.maxConcurrentQueries ??
+      this.config.safety.maxConcurrentQueries ??
+      DEFAULT_MAX_CONCURRENT_QUERIES
+    // A limit below 1 would leave every query waiting forever.
+    return Math.max(1, configuredLimit)
   }
 
   // All queries go through here so concurrent load on the same profile is
@@ -369,8 +366,7 @@ export class MySQLUtil implements DatabaseUtil {
   private async runQuery(profileName: string, sql: string): Promise<[OkPacket | RowDataPacket[], FieldPacket[]]> {
     const release = await this.acquireQuerySlot(profileName)
     try {
-      const connection = await this.getConnection(profileName)
-      return (await connection.query(sql)) as [OkPacket | RowDataPacket[], FieldPacket[]]
+      return (await this.getPool(profileName).query(sql)) as [OkPacket | RowDataPacket[], FieldPacket[]]
     } finally {
       release()
     }

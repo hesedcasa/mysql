@@ -10,8 +10,8 @@ const flushMicrotasks = async () =>
 
 describe('mysql-utils: MySQLUtil', () => {
   let MySQLUtil: any
-  let createConnectionStub: SinonStub
-  let mockConnection: {end: SinonStub; ping: SinonStub; query: SinonStub}
+  let createPoolStub: SinonStub
+  let mockPool: {end: SinonStub; query: SinonStub}
 
   const mockConfig = {
     defaultFormat: 'table' as const,
@@ -27,22 +27,21 @@ describe('mysql-utils: MySQLUtil', () => {
   }
 
   beforeEach(async () => {
-    mockConnection = {
+    mockPool = {
       end: stub().resolves(),
-      ping: stub().resolves(),
       query: stub(),
     }
-    createConnectionStub = stub().resolves(mockConnection)
+    createPoolStub = stub().returns(mockPool)
 
     const imported = await esmock('../../src/mysql/mysql-utils.js', {
-      'mysql2/promise': {default: {createConnection: createConnectionStub}},
+      'mysql2/promise': {default: {createPool: createPoolStub}},
     })
     MySQLUtil = imported.MySQLUtil
   })
 
   describe('listDatabases', () => {
     it('returns list of databases', async () => {
-      mockConnection.query.resolves([[{Database: 'mydb'}, {Database: 'testdb'}], []])
+      mockPool.query.resolves([[{Database: 'mydb'}, {Database: 'testdb'}], []])
 
       const util = new MySQLUtil(mockConfig)
       const result = await util.listDatabases('local')
@@ -53,7 +52,7 @@ describe('mysql-utils: MySQLUtil', () => {
     })
 
     it('returns error on query failure', async () => {
-      mockConnection.query.rejects(new Error('Access denied'))
+      mockPool.query.rejects(new Error('Access denied'))
 
       const util = new MySQLUtil(mockConfig)
       const result = await util.listDatabases('local')
@@ -81,7 +80,7 @@ describe('mysql-utils: MySQLUtil', () => {
     })
 
     it('executes SELECT with auto LIMIT applied', async () => {
-      mockConnection.query.resolves([[{id: 1, name: 'Alice'}], [{name: 'id'}, {name: 'name'}]])
+      mockPool.query.resolves([[{id: 1, name: 'Alice'}], [{name: 'id'}, {name: 'name'}]])
 
       const util = new MySQLUtil(mockConfig)
       const result = await util.executeQuery('local', 'SELECT * FROM users')
@@ -91,7 +90,7 @@ describe('mysql-utils: MySQLUtil', () => {
     })
 
     it('skips confirmation when skipConfirmation is true', async () => {
-      mockConnection.query.resolves([{affectedRows: 3, insertId: null}, []])
+      mockPool.query.resolves([{affectedRows: 3, insertId: null}, []])
 
       const util = new MySQLUtil(mockConfig)
       const result = await util.executeQuery('local', 'DELETE FROM sessions', 'table', true)
@@ -107,9 +106,19 @@ describe('mysql-utils: MySQLUtil', () => {
       safety: {...mockConfig.safety, maxConcurrentQueries: 2},
     }
 
+    it('sizes the connection pool to the effective query limit', async () => {
+      mockPool.query.resolves([[{Database: 'mydb'}], []])
+
+      const util = new MySQLUtil(limitedConfig)
+      await util.listDatabases('local')
+
+      expect(createPoolStub.calledOnce).to.be.true
+      expect(createPoolStub.firstCall.args[0].connectionLimit).to.equal(2)
+    })
+
     it('queues queries beyond the limit until a running query finishes', async () => {
       const resolvers: Array<(value: unknown) => void> = []
-      mockConnection.query.callsFake(
+      mockPool.query.callsFake(
         async () =>
           new Promise((resolve) => {
             resolvers.push(resolve)
@@ -122,12 +131,12 @@ describe('mysql-utils: MySQLUtil', () => {
       const third = util.listDatabases('local')
 
       await flushMicrotasks()
-      expect(mockConnection.query.callCount).to.equal(2)
+      expect(mockPool.query.callCount).to.equal(2)
 
       resolvers[0]([[{Database: 'mydb'}], []])
       await first
       await flushMicrotasks()
-      expect(mockConnection.query.callCount).to.equal(3)
+      expect(mockPool.query.callCount).to.equal(3)
 
       resolvers[1]([[{Database: 'mydb'}], []])
       resolvers[2]([[{Database: 'mydb'}], []])
@@ -137,8 +146,8 @@ describe('mysql-utils: MySQLUtil', () => {
     })
 
     it('frees the slot when a query fails so waiting queries still run', async () => {
-      mockConnection.query.onFirstCall().rejects(new Error('boom'))
-      mockConnection.query.onSecondCall().resolves([[{Database: 'mydb'}], []])
+      mockPool.query.onFirstCall().rejects(new Error('boom'))
+      mockPool.query.onSecondCall().resolves([[{Database: 'mydb'}], []])
 
       const util = new MySQLUtil({...mockConfig, safety: {...mockConfig.safety, maxConcurrentQueries: 1}})
       const [failed, succeeded] = await Promise.all([util.listDatabases('local'), util.listDatabases('local')])
@@ -150,7 +159,7 @@ describe('mysql-utils: MySQLUtil', () => {
 
     it('rejects queued queries when closeAll is called', async () => {
       const resolvers: Array<(value: unknown) => void> = []
-      mockConnection.query.callsFake(
+      mockPool.query.callsFake(
         async () =>
           new Promise((resolve) => {
             resolvers.push(resolve)
@@ -162,7 +171,7 @@ describe('mysql-utils: MySQLUtil', () => {
       const queued = util.listDatabases('local')
 
       await flushMicrotasks()
-      expect(mockConnection.query.callCount).to.equal(1)
+      expect(mockPool.query.callCount).to.equal(1)
 
       await util.closeAll()
 
@@ -177,7 +186,7 @@ describe('mysql-utils: MySQLUtil', () => {
 
     it('prefers the profile-level maxConcurrentQueries over the safety default', async () => {
       const resolvers: Array<(value: unknown) => void> = []
-      mockConnection.query.callsFake(
+      mockPool.query.callsFake(
         async () =>
           new Promise((resolve) => {
             resolvers.push(resolve)
@@ -196,12 +205,12 @@ describe('mysql-utils: MySQLUtil', () => {
       const second = util.listDatabases('local')
 
       await flushMicrotasks()
-      expect(mockConnection.query.callCount).to.equal(1)
+      expect(mockPool.query.callCount).to.equal(1)
 
       resolvers[0]([[{Database: 'mydb'}], []])
       await first
       await flushMicrotasks()
-      expect(mockConnection.query.callCount).to.equal(2)
+      expect(mockPool.query.callCount).to.equal(2)
 
       resolvers[1]([[{Database: 'mydb'}], []])
       await second
@@ -209,7 +218,7 @@ describe('mysql-utils: MySQLUtil', () => {
 
     it('tracks limits per profile independently', async () => {
       const resolvers: Array<(value: unknown) => void> = []
-      mockConnection.query.callsFake(
+      mockPool.query.callsFake(
         async () =>
           new Promise((resolve) => {
             resolvers.push(resolve)
@@ -231,12 +240,12 @@ describe('mysql-utils: MySQLUtil', () => {
 
       await flushMicrotasks()
       // One slot per profile: local1 and other run, local2 waits.
-      expect(mockConnection.query.callCount).to.equal(2)
+      expect(mockPool.query.callCount).to.equal(2)
 
       for (const resolve of resolvers) resolve([[{Database: 'mydb'}], []])
       await Promise.all([local1, other])
       await flushMicrotasks()
-      expect(mockConnection.query.callCount).to.equal(3)
+      expect(mockPool.query.callCount).to.equal(3)
 
       resolvers[2]([[{Database: 'mydb'}], []])
       await local2
@@ -246,13 +255,13 @@ describe('mysql-utils: MySQLUtil', () => {
   describe('closeAll', () => {
     it('closes all pooled connections', async () => {
       // eslint-disable-next-line camelcase
-      mockConnection.query.resolves([[{current_database: 'mydb', version: '8.0.32'}], []])
+      mockPool.query.resolves([[{current_database: 'mydb', version: '8.0.32'}], []])
 
       const util = new MySQLUtil(mockConfig)
       await util.testConnection('local') // creates a connection
       await util.closeAll()
 
-      expect(mockConnection.end.calledOnce).to.be.true
+      expect(mockPool.end.calledOnce).to.be.true
     })
   })
 })
