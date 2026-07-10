@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/hesedcasa/mysql/compare/v0.5.2...v0.6.0) (2026-07-10)
+
+
+### 🎉 Features
+
+* limit concurrent queries per database profile ([#71](https://github.com/hesedcasa/mysql/issues/71)) ([611ff1e](https://github.com/hesedcasa/mysql/commit/611ff1eb6d80b4229945edc02dbd2c485b466af2))
+
 ## [0.5.2](https://github.com/hesedcasa/mysql/compare/v0.5.1...v0.5.2) (2026-06-26)
 
 
