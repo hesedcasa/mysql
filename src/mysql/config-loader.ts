@@ -3,8 +3,10 @@ import type {ConnectionOptions as MySQL2ConnectionOptions} from 'mysql2/promise'
 export interface DatabaseProfile {
   database: string
   host: string
+  maxConcurrentQueries?: number
   password: string
   port: number
+  queryQueueTimeoutMs?: number
   ssl?: boolean
   user: string
 }
@@ -12,6 +14,8 @@ export interface DatabaseProfile {
 interface SafetyConfig {
   blacklistedOperations: string[]
   defaultLimit: number
+  maxConcurrentQueries?: number
+  queryQueueTimeoutMs?: number
   requireConfirmationFor: string[]
 }
 

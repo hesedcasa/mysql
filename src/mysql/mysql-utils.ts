@@ -1,4 +1,4 @@
-import type {Connection, FieldPacket, OkPacket, RowDataPacket} from 'mysql2/promise'
+import type {FieldPacket, OkPacket, Pool, RowDataPacket} from 'mysql2/promise'
 
 import mysql from 'mysql2/promise'
 
@@ -19,19 +19,43 @@ import {getMySQLConnectionOptions} from './config-loader.js'
 import {FORMATTERS} from './formatters.js'
 import {analyzeQuery, applyDefaultLimit, checkBlacklist, getQueryType, requiresConfirmation} from './query-validator.js'
 
+const DEFAULT_MAX_CONCURRENT_QUERIES = 5
+const DEFAULT_QUEUE_TIMEOUT_MS = 60_000
+
+interface QueryWaiter {
+  grant: () => void
+  reject: (error: Error) => void
+}
+
+interface QuerySlotState {
+  active: number
+  waiting: QueryWaiter[]
+}
+
 export class MySQLUtil implements DatabaseUtil {
   private config: MySQLConfig
-  private connections: Map<string, Promise<Connection>>
+  private pools: Map<string, Pool>
+  private querySlots: Map<string, QuerySlotState>
 
   constructor(config: MySQLConfig) {
     this.config = config
-    this.connections = new Map()
+    this.pools = new Map()
+    this.querySlots = new Map()
   }
 
   async closeAll(): Promise<void> {
-    const entries = [...this.connections.values()]
-    this.connections.clear()
-    await Promise.allSettled(entries.map(async (connPromise) => (await connPromise).end()))
+    // Reject queued queries first so nothing waits forever on a closed util.
+    for (const slot of this.querySlots.values()) {
+      for (const waiter of slot.waiting.splice(0)) {
+        waiter.reject(new Error('Connections were closed while the query was waiting for a free slot'))
+      }
+    }
+
+    this.querySlots.clear()
+
+    const pools = [...this.pools.values()]
+    this.pools.clear()
+    await Promise.allSettled(pools.map((pool) => pool.end()))
   }
 
   async describeTable(
@@ -40,8 +64,7 @@ export class MySQLUtil implements DatabaseUtil {
     format: 'json' | 'table' | 'toon' = 'table',
   ): Promise<TableStructureResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows, fields] = await connection.query(`DESCRIBE ${table}`)
+      const [rows, fields] = await this.runQuery(profileName, `DESCRIBE ${table}`)
       return {
         data: {
           result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
@@ -108,8 +131,7 @@ export class MySQLUtil implements DatabaseUtil {
     }
 
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows, fields] = await connection.query(finalQuery)
+      const [rows, fields] = await this.runQuery(profileName, finalQuery)
 
       const isRead =
         queryType === 'SELECT' || queryType === 'SHOW' || queryType === 'DESCRIBE' || queryType === 'EXPLAIN'
@@ -146,8 +168,7 @@ export class MySQLUtil implements DatabaseUtil {
     format: 'json' | 'table' | 'toon' = 'table',
   ): Promise<ExplainResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows, fields] = await connection.query(`EXPLAIN ${query}`)
+      const [rows, fields] = await this.runQuery(profileName, `EXPLAIN ${query}`)
       return {
         data: {
           plan: rows as RowDataPacket[],
@@ -166,8 +187,7 @@ export class MySQLUtil implements DatabaseUtil {
 
   async listDatabases(profileName: string): Promise<DatabaseListResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows] = await connection.query('SHOW DATABASES')
+      const [rows] = await this.runQuery(profileName, 'SHOW DATABASES')
       const databases = (rows as RowDataPacket[]).map((row) => row.Database as string)
       return {
         data: {
@@ -187,8 +207,7 @@ export class MySQLUtil implements DatabaseUtil {
 
   async listTables(profileName: string): Promise<TableListResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows] = await connection.query('SHOW TABLES')
+      const [rows] = await this.runQuery(profileName, 'SHOW TABLES')
 
       const rowsArray = rows as RowDataPacket[]
       const tableKey = Object.keys(rowsArray[0])[0]
@@ -216,8 +235,7 @@ export class MySQLUtil implements DatabaseUtil {
     format: 'json' | 'table' | 'toon' = 'table',
   ): Promise<IndexResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows, fields] = await connection.query(`SHOW INDEXES FROM ${table}`)
+      const [rows, fields] = await this.runQuery(profileName, `SHOW INDEXES FROM ${table}`)
       return {
         data: {
           indexes: rows as RowDataPacket[],
@@ -236,8 +254,7 @@ export class MySQLUtil implements DatabaseUtil {
 
   async testConnection(profileName: string): Promise<ConnectionTestResult> {
     try {
-      const connection = await this.getConnection(profileName)
-      const [rows] = await connection.query('SELECT VERSION() as version, DATABASE() as current_database')
+      const [rows] = await this.runQuery(profileName, 'SELECT VERSION() as version, DATABASE() as current_database')
 
       const info = (rows as RowDataPacket[])[0]
       return {
@@ -255,6 +272,64 @@ export class MySQLUtil implements DatabaseUtil {
         success: false,
       }
     }
+  }
+
+  // Grants a query slot for the profile, or waits until one frees up. The
+  // returned release callback must be invoked exactly once per acquisition.
+  private acquireQuerySlot(profileName: string): Promise<() => void> {
+    const limit = this.getQueryLimit(profileName)
+    let slot = this.querySlots.get(profileName)
+    if (!slot) {
+      slot = {active: 0, waiting: []}
+      this.querySlots.set(profileName, slot)
+    }
+
+    const state = slot
+    const release = () => {
+      const next = state.waiting.shift()
+      if (next) {
+        next.grant()
+      } else {
+        state.active -= 1
+      }
+    }
+
+    if (state.active < limit) {
+      state.active += 1
+      return Promise.resolve(release)
+    }
+
+    const timeoutMs =
+      this.config.profiles[profileName]?.queryQueueTimeoutMs ??
+      this.config.safety.queryQueueTimeoutMs ??
+      DEFAULT_QUEUE_TIMEOUT_MS
+    process.stderr.write(`Waiting for a free query slot (${limit}/${limit} in use for profile "${profileName}")...\n`)
+
+    return new Promise((resolve, reject) => {
+      const waiter: QueryWaiter = {
+        grant() {
+          clearTimeout(timer)
+          resolve(release)
+        },
+        reject(error: Error) {
+          clearTimeout(timer)
+          reject(error)
+        },
+      }
+      const timer = setTimeout(() => {
+        const index = state.waiting.indexOf(waiter)
+        if (index !== -1) state.waiting.splice(index, 1)
+        reject(
+          new Error(
+            `Timed out after ${timeoutMs / 1000}s waiting for a free query slot ` +
+              `(limit: ${limit} concurrent queries for profile "${profileName}")`,
+          ),
+        )
+      }, timeoutMs)
+      // Don't let a pending queue timer keep the CLI process alive.
+      timer.unref?.()
+      state.waiting.push(waiter)
+    })
   }
 
   private formatReadResult(
@@ -290,26 +365,39 @@ export class MySQLUtil implements DatabaseUtil {
     return data
   }
 
-  private async getConnection(profileName: string): Promise<Connection> {
-    const existing = this.connections.get(profileName)
-    if (existing) {
-      try {
-        const conn = await existing
-        await conn.ping()
-        return conn
-      } catch {
-        this.connections.delete(profileName)
-      }
-    }
+  // The pool is sized to the profile's query limit so slot holders each get a
+  // real physical connection — a single Connection would serialize commands on
+  // the wire and make the concurrency limit meaningless.
+  private getPool(profileName: string): Pool {
+    const existing = this.pools.get(profileName)
+    if (existing) return existing
 
-    const connPromise = mysql.createConnection(getMySQLConnectionOptions(this.config, profileName))
-    this.connections.set(profileName, connPromise)
+    const pool = mysql.createPool({
+      ...getMySQLConnectionOptions(this.config, profileName),
+      connectionLimit: this.getQueryLimit(profileName),
+      waitForConnections: true,
+    })
+    this.pools.set(profileName, pool)
+    return pool
+  }
 
+  private getQueryLimit(profileName: string): number {
+    const configuredLimit =
+      this.config.profiles[profileName]?.maxConcurrentQueries ??
+      this.config.safety.maxConcurrentQueries ??
+      DEFAULT_MAX_CONCURRENT_QUERIES
+    // A limit below 1 would leave every query waiting forever.
+    return Math.max(1, configuredLimit)
+  }
+
+  // All queries go through here so concurrent load on the same profile is
+  // capped at maxConcurrentQueries; excess queries wait for a free slot.
+  private async runQuery(profileName: string, sql: string): Promise<[OkPacket | RowDataPacket[], FieldPacket[]]> {
+    const release = await this.acquireQuerySlot(profileName)
     try {
-      return await connPromise
-    } catch (error) {
-      this.connections.delete(profileName)
-      throw error
+      return (await this.getPool(profileName).query(sql)) as [OkPacket | RowDataPacket[], FieldPacket[]]
+    } finally {
+      release()
     }
   }
 }

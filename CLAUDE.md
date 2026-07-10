@@ -40,7 +40,7 @@ src/
 │   ├── tables.ts
 │   ├── describe-table.ts
 │   ├── indexes.ts
-│   └── explain-query.ts
+│   └── explain.ts
 ├── mysql/               # MySQL interaction layer
 │   ├── mysql-client.ts  # Singleton client + exported functions (setConfigDir, getMySQLConfig, executeQuery, etc.)
 │   ├── mysql-utils.ts   # MySQLUtil class — connection pooling, formatting, safety enforcement
@@ -128,13 +128,17 @@ Stored at `~/.config/mysql/mysql-config.json` (multi-profile format):
       "user": "root",
       "password": "secret",
       "database": "mydb",
-      "ssl": false
+      "ssl": false,
+      "maxConcurrentQueries": 5,
+      "queryQueueTimeoutMs": 60000
     }
   }
 }
 ```
 
 Auth commands (`mq mysql auth add/test/update`) manage this file. `auth add` creates the file with mode `0o600`.
+
+`maxConcurrentQueries` (optional, default 5) caps concurrent queries per profile — queries beyond the cap print a waiting notice to stderr and wait until a running query finishes. `queryQueueTimeoutMs` (optional, default 60000) is how long a query may wait for a free slot before failing with a timeout error; both can be set per profile, falling back to the safety config.
 
 ## Testing
 
@@ -162,7 +166,7 @@ stub(cmd, 'log')
 await cmd.run()
 ```
 
-**MySQL layer tests** (`test/mysql/mysql-utils.test.ts`) — stub `mysql.createConnection` directly.
+**MySQL layer tests** (`test/mysql/mysql-utils.test.ts`) — stub `mysql.createPool` directly.
 
 **Auth command tests** — mock `@inquirer/prompts` input function in `beforeEach` to avoid blocking on stdin:
 
