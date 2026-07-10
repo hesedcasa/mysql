@@ -184,6 +184,40 @@ describe('mysql-utils: MySQLUtil', () => {
       expect(runningResult.success).to.be.true
     })
 
+    it('fails a queued query that waits longer than queryQueueTimeoutMs', async () => {
+      const resolvers: Array<(value: unknown) => void> = []
+      mockPool.query.callsFake(
+        async () =>
+          new Promise((resolve) => {
+            resolvers.push(resolve)
+          }),
+      )
+
+      const util = new MySQLUtil({
+        ...mockConfig,
+        safety: {...mockConfig.safety, maxConcurrentQueries: 1, queryQueueTimeoutMs: 20},
+      })
+      const running = util.listDatabases('local')
+      const queued = util.listDatabases('local')
+
+      const queuedResult = await queued
+      expect(queuedResult.success).to.be.false
+      expect(queuedResult.error).to.include('Timed out after 0.02s waiting for a free query slot')
+
+      // The slot itself is unaffected: the running query still completes,
+      // and its release must not grant a slot to the timed-out waiter.
+      resolvers[0]([[{Database: 'mydb'}], []])
+      const runningResult = await running
+      expect(runningResult.success).to.be.true
+
+      // A fresh query can still acquire the freed slot afterwards.
+      const after = util.listDatabases('local')
+      await flushMicrotasks()
+      resolvers[1]([[{Database: 'mydb'}], []])
+      const afterResult = await after
+      expect(afterResult.success).to.be.true
+    })
+
     it('prefers the profile-level maxConcurrentQueries over the safety default', async () => {
       const resolvers: Array<(value: unknown) => void> = []
       mockPool.query.callsFake(

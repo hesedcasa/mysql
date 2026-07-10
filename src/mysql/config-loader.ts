@@ -14,6 +14,7 @@ interface SafetyConfig {
   blacklistedOperations: string[]
   defaultLimit: number
   maxConcurrentQueries?: number
+  queryQueueTimeoutMs?: number
   requireConfirmationFor: string[]
 }
 

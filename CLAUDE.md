@@ -137,7 +137,7 @@ Stored at `~/.config/mysql/mysql-config.json` (multi-profile format):
 
 Auth commands (`mq mysql auth add/test/update`) manage this file. `auth add` creates the file with mode `0o600`.
 
-`maxConcurrentQueries` (optional, default 5) caps concurrent queries per profile — queries beyond the cap wait until a running query finishes.
+`maxConcurrentQueries` (optional, default 5) caps concurrent queries per profile — queries beyond the cap print a waiting notice to stderr and wait until a running query finishes, failing with a timeout error after 30 seconds (`safety.queryQueueTimeoutMs`).
 
 ## Testing
 

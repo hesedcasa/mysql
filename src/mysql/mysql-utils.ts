@@ -20,6 +20,7 @@ import {FORMATTERS} from './formatters.js'
 import {analyzeQuery, applyDefaultLimit, checkBlacklist, getQueryType, requiresConfirmation} from './query-validator.js'
 
 const DEFAULT_MAX_CONCURRENT_QUERIES = 5
+const DEFAULT_QUEUE_TIMEOUT_MS = 30_000
 
 interface QueryWaiter {
   grant: () => void
@@ -298,8 +299,33 @@ export class MySQLUtil implements DatabaseUtil {
       return Promise.resolve(release)
     }
 
+    const timeoutMs = this.config.safety.queryQueueTimeoutMs ?? DEFAULT_QUEUE_TIMEOUT_MS
+    process.stderr.write(`Waiting for a free query slot (${limit}/${limit} in use for profile "${profileName}")...\n`)
+
     return new Promise((resolve, reject) => {
-      state.waiting.push({grant: () => resolve(release), reject})
+      const waiter: QueryWaiter = {
+        grant() {
+          clearTimeout(timer)
+          resolve(release)
+        },
+        reject(error: Error) {
+          clearTimeout(timer)
+          reject(error)
+        },
+      }
+      const timer = setTimeout(() => {
+        const index = state.waiting.indexOf(waiter)
+        if (index !== -1) state.waiting.splice(index, 1)
+        reject(
+          new Error(
+            `Timed out after ${timeoutMs / 1000}s waiting for a free query slot ` +
+              `(limit: ${limit} concurrent queries for profile "${profileName}")`,
+          ),
+        )
+      }, timeoutMs)
+      // Don't let a pending queue timer keep the CLI process alive.
+      timer.unref?.()
+      state.waiting.push(waiter)
     })
   }
 
