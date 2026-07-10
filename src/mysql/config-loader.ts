@@ -6,6 +6,7 @@ export interface DatabaseProfile {
   maxConcurrentQueries?: number
   password: string
   port: number
+  queryQueueTimeoutMs?: number
   ssl?: boolean
   user: string
 }

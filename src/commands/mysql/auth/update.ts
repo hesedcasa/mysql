@@ -16,6 +16,13 @@ const fields: FieldDef[] = [
     required: false,
     type: 'number',
   },
+  {
+    default: 60_000,
+    description: 'Milliseconds a query may wait for a free query slot before failing',
+    name: 'queryQueueTimeoutMs',
+    required: false,
+    type: 'number',
+  },
 ]
 
 export default createAuthUpdateCommand({

@@ -20,7 +20,7 @@ import {FORMATTERS} from './formatters.js'
 import {analyzeQuery, applyDefaultLimit, checkBlacklist, getQueryType, requiresConfirmation} from './query-validator.js'
 
 const DEFAULT_MAX_CONCURRENT_QUERIES = 5
-const DEFAULT_QUEUE_TIMEOUT_MS = 30_000
+const DEFAULT_QUEUE_TIMEOUT_MS = 60_000
 
 interface QueryWaiter {
   grant: () => void
@@ -299,7 +299,10 @@ export class MySQLUtil implements DatabaseUtil {
       return Promise.resolve(release)
     }
 
-    const timeoutMs = this.config.safety.queryQueueTimeoutMs ?? DEFAULT_QUEUE_TIMEOUT_MS
+    const timeoutMs =
+      this.config.profiles[profileName]?.queryQueueTimeoutMs ??
+      this.config.safety.queryQueueTimeoutMs ??
+      DEFAULT_QUEUE_TIMEOUT_MS
     process.stderr.write(`Waiting for a free query slot (${limit}/${limit} in use for profile "${profileName}")...\n`)
 
     return new Promise((resolve, reject) => {

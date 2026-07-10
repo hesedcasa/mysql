@@ -218,6 +218,24 @@ describe('mysql-utils: MySQLUtil', () => {
       expect(afterResult.success).to.be.true
     })
 
+    it('prefers the profile-level queryQueueTimeoutMs over the safety default', async () => {
+      mockPool.query.callsFake(async () => new Promise(() => {})) // never resolves
+
+      // Safety allows a long wait, but the profile times out almost immediately.
+      const util = new MySQLUtil({
+        ...mockConfig,
+        profiles: {
+          local: {...mockConfig.profiles.local, maxConcurrentQueries: 1, queryQueueTimeoutMs: 20},
+        },
+        safety: {...mockConfig.safety, queryQueueTimeoutMs: 60_000},
+      })
+      void util.listDatabases('local')
+      const queued = await util.listDatabases('local')
+
+      expect(queued.success).to.be.false
+      expect(queued.error).to.include('Timed out after 0.02s')
+    })
+
     it('prefers the profile-level maxConcurrentQueries over the safety default', async () => {
       const resolvers: Array<(value: unknown) => void> = []
       mockPool.query.callsFake(
