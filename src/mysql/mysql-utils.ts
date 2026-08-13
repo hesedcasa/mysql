@@ -1,8 +1,5 @@
-import type {FieldPacket, OkPacket, Pool, RowDataPacket} from 'mysql2/promise'
+import mysql, {type FieldPacket, type OkPacket, type Pool, type RowDataPacket} from 'mysql2/promise'
 
-import mysql from 'mysql2/promise'
-
-import type {MySQLConfig} from './config-loader.js'
 import type {
   ConnectionTestResult,
   DatabaseListResult,
@@ -15,27 +12,32 @@ import type {
   TableStructureResult,
 } from './database.js'
 
-import {getMySQLConnectionOptions} from './config-loader.js'
+import {getMySQLConnectionOptions, type MySQLConfig} from './config-loader.js'
 import {FORMATTERS} from './formatters.js'
 import {analyzeQuery, applyDefaultLimit, checkBlacklist, getQueryType, requiresConfirmation} from './query-validator.js'
 
 const DEFAULT_MAX_CONCURRENT_QUERIES = 5
 const DEFAULT_QUEUE_TIMEOUT_MS = 60_000
 
-interface QueryWaiter {
+// Formats that must emit only the data payload on stdout.
+const MACHINE_FORMATS = new Set<string>(['csv', 'json', 'toon'])
+// Query types whose result set is rows rather than an OkPacket.
+const READ_QUERY_TYPES = new Set<string>(['DESCRIBE', 'EXPLAIN', 'SELECT', 'SHOW'])
+
+type QueryWaiter = {
   grant: () => void
   reject: (error: Error) => void
 }
 
-interface QuerySlotState {
+type QuerySlotState = {
   active: number
   waiting: QueryWaiter[]
 }
 
 export class MySQLUtil implements DatabaseUtil {
-  private config: MySQLConfig
-  private pools: Map<string, Pool>
-  private querySlots: Map<string, QuerySlotState>
+  private readonly config: MySQLConfig
+  private readonly pools: Map<string, Pool>
+  private readonly querySlots: Map<string, QuerySlotState>
 
   constructor(config: MySQLConfig) {
     this.config = config
@@ -46,7 +48,9 @@ export class MySQLUtil implements DatabaseUtil {
   async closeAll(): Promise<void> {
     // Reject queued queries first so nothing waits forever on a closed util.
     for (const slot of this.querySlots.values()) {
-      for (const waiter of slot.waiting.splice(0)) {
+      const {waiting} = slot
+      slot.waiting = []
+      for (const waiter of waiting) {
         waiter.reject(new Error('Connections were closed while the query was waiting for a free slot'))
       }
     }
@@ -55,7 +59,7 @@ export class MySQLUtil implements DatabaseUtil {
 
     const pools = [...this.pools.values()]
     this.pools.clear()
-    await Promise.allSettled(pools.map((pool) => pool.end()))
+    await Promise.allSettled(pools.map(async (pool) => pool.end()))
   }
 
   async describeTable(
@@ -67,7 +71,7 @@ export class MySQLUtil implements DatabaseUtil {
       const [rows, fields] = await this.runQuery(profileName, `DESCRIBE ${table}`)
       return {
         data: {
-          result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
+          result: this.formatRows(rows as RowDataPacket[], fields, format),
           structure: rows as RowDataPacket[],
         },
         success: true,
@@ -110,7 +114,7 @@ export class MySQLUtil implements DatabaseUtil {
 
     // Machine-readable formats must emit only the data payload on stdout, so
     // analysis warnings and status lines are collected as notices instead.
-    const machineFormat = format === 'json' || format === 'csv' || format === 'toon'
+    const isMachineFormat = MACHINE_FORMATS.has(format)
     const notices: string[] = []
 
     const warnings = analyzeQuery(query)
@@ -133,10 +137,9 @@ export class MySQLUtil implements DatabaseUtil {
     try {
       const [rows, fields] = await this.runQuery(profileName, finalQuery)
 
-      const isRead =
-        queryType === 'SELECT' || queryType === 'SHOW' || queryType === 'DESCRIBE' || queryType === 'EXPLAIN'
+      const isRead = READ_QUERY_TYPES.has(queryType)
       let data = isRead
-        ? this.formatReadResult(rows as RowDataPacket[], fields as FieldPacket[], format, notices)
+        ? this.formatReadResult(rows as RowDataPacket[], fields, format, notices)
         : this.formatWriteResult(rows as OkPacket, notices, format)
 
       if (format === 'json') {
@@ -148,8 +151,8 @@ export class MySQLUtil implements DatabaseUtil {
       // For machine formats the data is returned alone and notices go to stderr.
       return {
         data: {
-          notices: machineFormat ? notice : undefined,
-          result: machineFormat ? data : `${notice}\n\n${data}`,
+          notices: isMachineFormat ? notice : undefined,
+          result: isMachineFormat ? data : `${notice}\n\n${data}`,
         },
         success: true,
       }
@@ -172,7 +175,7 @@ export class MySQLUtil implements DatabaseUtil {
       return {
         data: {
           plan: rows as RowDataPacket[],
-          result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
+          result: this.formatRows(rows as RowDataPacket[], fields, format),
         },
         success: true,
       }
@@ -239,7 +242,7 @@ export class MySQLUtil implements DatabaseUtil {
       return {
         data: {
           indexes: rows as RowDataPacket[],
-          result: this.formatRows(rows as RowDataPacket[], fields as FieldPacket[], format),
+          result: this.formatRows(rows as RowDataPacket[], fields, format),
         },
         success: true,
       }
@@ -276,7 +279,7 @@ export class MySQLUtil implements DatabaseUtil {
 
   // Grants a query slot for the profile, or waits until one frees up. The
   // returned release callback must be invoked exactly once per acquisition.
-  private acquireQuerySlot(profileName: string): Promise<() => void> {
+  private async acquireQuerySlot(profileName: string): Promise<() => void> {
     const limit = this.getQueryLimit(profileName)
     let slot = this.querySlots.get(profileName)
     if (!slot) {
@@ -296,7 +299,7 @@ export class MySQLUtil implements DatabaseUtil {
 
     if (state.active < limit) {
       state.active += 1
-      return Promise.resolve(release)
+      return release
     }
 
     const timeoutMs =
@@ -395,7 +398,7 @@ export class MySQLUtil implements DatabaseUtil {
   private async runQuery(profileName: string, sql: string): Promise<[OkPacket | RowDataPacket[], FieldPacket[]]> {
     const release = await this.acquireQuerySlot(profileName)
     try {
-      return (await this.getPool(profileName).query(sql)) as [OkPacket | RowDataPacket[], FieldPacket[]]
+      return await this.getPool(profileName).query(sql)
     } finally {
       release()
     }

@@ -1,6 +1,7 @@
 import type {FieldPacket, RowDataPacket} from 'mysql2/promise'
 
 import {encode} from '@toon-format/toon'
+import {Buffer} from 'node:buffer'
 
 import type {OutputFormat} from './database.js'
 

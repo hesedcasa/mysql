@@ -2,7 +2,7 @@ import type {ApiResult} from '@hesed/plugin-lib'
 
 export type OutputFormat = 'csv' | 'json' | 'table' | 'toon'
 
-export interface QueryData {
+export type QueryData = {
   message?: string
   notices?: string
   requiresConfirmation?: boolean
@@ -11,32 +11,32 @@ export interface QueryData {
   result?: unknown
 }
 
-export interface DatabaseListData {
+export type DatabaseListData = {
   databases: string[]
   result?: string
 }
 
-export interface TableListData {
+export type TableListData = {
   result?: string
   tables: string[]
 }
 
-export interface TableStructureData {
+export type TableStructureData = {
   result?: string
-  structure: Record<string, unknown>[]
+  structure: Array<Record<string, unknown>>
 }
 
-export interface IndexData {
-  indexes: Record<string, unknown>[]
-  result?: string
-}
-
-export interface ExplainData {
-  plan: Record<string, unknown>[]
+export type IndexData = {
+  indexes: Array<Record<string, unknown>>
   result?: string
 }
 
-interface ConnectionTestData {
+export type ExplainData = {
+  plan: Array<Record<string, unknown>>
+  result?: string
+}
+
+type ConnectionTestData = {
   database: string
   result?: string
   version: string
@@ -50,7 +50,7 @@ export type IndexResult = ApiResult & {data?: IndexData}
 export type ExplainResult = ApiResult & {data?: ExplainData}
 export type ConnectionTestResult = ApiResult & {data?: ConnectionTestData}
 
-export interface DatabaseUtil {
+export type DatabaseUtil = {
   closeAll(): Promise<void>
   describeTable(profileName: string, table: string, format?: OutputFormat): Promise<TableStructureResult>
   executeQuery(

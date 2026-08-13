@@ -316,7 +316,6 @@ describe('mysql-utils: MySQLUtil', () => {
 
   describe('closeAll', () => {
     it('closes all pooled connections', async () => {
-      // eslint-disable-next-line camelcase
       mockPool.query.resolves([[{current_database: 'mydb', version: '8.0.32'}], []])
 
       const util = new MySQLUtil(mockConfig)

@@ -26,8 +26,8 @@
     "@types/sinon": "^22.0.0",
     "c8": "^11.0.0",
     "chai": "^6",
-    "eslint": "^9",
-    "eslint-config-oclif": "^6",
+    "eslint": "^10",
+    "eslint-config-oclif": "^7",
     "eslint-config-prettier": "^10",
     "esmock": "^2.7.3",
     "mocha": "^11",
@@ -40,7 +40,7 @@
     "typescript": "^5"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "files": [
     "./bin",

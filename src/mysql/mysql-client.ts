@@ -126,9 +126,11 @@ export async function testDirectConnection(profile: DatabaseProfile): Promise<Co
 }
 
 export async function closeConnections(): Promise<void> {
-  if (mysqlUtil) {
-    await mysqlUtil.closeAll()
-    mysqlUtil = null
-    cachedConfig = null
+  if (!mysqlUtil) {
+    return
   }
+
+  await mysqlUtil.closeAll()
+  mysqlUtil = null
+  cachedConfig = null
 }

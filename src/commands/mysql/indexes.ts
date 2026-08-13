@@ -1,19 +1,21 @@
-import {ApiResult} from '@hesed/plugin-lib'
+import {type ApiResult} from '@hesed/plugin-lib'
 import {Args, Flags} from '@oclif/core'
 
 import {BaseCommand} from '../../base-command.js'
-import {IndexData} from '../../mysql/database.js'
+import {type IndexData} from '../../mysql/database.js'
 import {closeConnections, showIndexes} from '../../mysql/index.js'
 
 export default class MySQLIndexes extends BaseCommand {
   static override args = {
     table: Args.string({description: 'Table name to show indexes for', required: true}),
   }
+
   static override description = 'Show indexes for a MySQL table'
   static override examples = [
     '<%= config.bin %> <%= command.id %> users',
     '<%= config.bin %> <%= command.id %> orders --json -p prod',
   ]
+
   static override flags = {
     profile: Flags.string({char: 'p', description: 'Database profile name from config', required: false}),
     toon: Flags.boolean({description: 'Format output as toon', required: false}),

@@ -1,19 +1,21 @@
-import {ApiResult} from '@hesed/plugin-lib'
+import {type ApiResult} from '@hesed/plugin-lib'
 import {Args, Flags} from '@oclif/core'
 
 import {BaseCommand} from '../../base-command.js'
-import {TableStructureData} from '../../mysql/database.js'
+import {type TableStructureData} from '../../mysql/database.js'
 import {closeConnections, describeTable} from '../../mysql/index.js'
 
 export default class MySQLDescribeTable extends BaseCommand {
   static override args = {
     table: Args.string({description: 'Table name to describe', required: true}),
   }
+
   static override description = 'Describe the structure of a MySQL table'
   static override examples = [
     '<%= config.bin %> <%= command.id %> users',
     '<%= config.bin %> <%= command.id %> orders --toon -p prod',
   ]
+
   static override flags = {
     profile: Flags.string({char: 'p', description: 'Database profile name from config', required: false}),
     toon: Flags.boolean({description: 'Format output as toon', required: false}),
