@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/hesedcasa/mysql/compare/v0.6.0...v0.6.1) (2026-08-13)
+
+
+### ♻️ Chores
+
+* upgrade ESLint and fix TypeScript compilation errors ([#82](https://github.com/hesedcasa/mysql/issues/82)) ([69aede4](https://github.com/hesedcasa/mysql/commit/69aede40ca23d497a7c2e9ba8234ebe16c830ff3))
+
 ## [0.6.0](https://github.com/hesedcasa/mysql/compare/v0.5.2...v0.6.0) (2026-07-10)
 
 
