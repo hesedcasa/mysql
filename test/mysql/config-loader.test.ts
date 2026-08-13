@@ -1,8 +1,6 @@
 import {expect} from 'chai'
 
-import type {MySQLConfig} from '../../src/mysql/config-loader.js'
-
-import {getMySQLConnectionOptions} from '../../src/mysql/config-loader.js'
+import {getMySQLConnectionOptions, type MySQLConfig} from '../../src/mysql/config-loader.js'
 
 describe('mysql/config-loader', () => {
   const mockConfig: MySQLConfig = {

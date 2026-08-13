@@ -1,6 +1,6 @@
 import type {ConnectionOptions as MySQL2ConnectionOptions} from 'mysql2/promise'
 
-export interface DatabaseProfile {
+export type DatabaseProfile = {
   database: string
   host: string
   maxConcurrentQueries?: number
@@ -11,7 +11,7 @@ export interface DatabaseProfile {
   user: string
 }
 
-interface SafetyConfig {
+type SafetyConfig = {
   blacklistedOperations: string[]
   defaultLimit: number
   maxConcurrentQueries?: number
@@ -19,7 +19,7 @@ interface SafetyConfig {
   requireConfirmationFor: string[]
 }
 
-export interface MySQLConfig {
+export type MySQLConfig = {
   defaultFormat: 'csv' | 'json' | 'table' | 'toon'
   defaultProfile: string
   profiles: Record<string, DatabaseProfile>

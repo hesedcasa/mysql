@@ -3,7 +3,7 @@ import type {ApiResult} from '@hesed/plugin-lib'
 import {Flags} from '@oclif/core'
 
 import {BaseCommand} from '../../base-command.js'
-import {TableListData} from '../../mysql/database.js'
+import {type TableListData} from '../../mysql/database.js'
 import {closeConnections, listTables} from '../../mysql/index.js'
 
 export default class MySQLTables extends BaseCommand {
