@@ -58,7 +58,43 @@ describe('mysql-utils: MySQLUtil', () => {
       const result = await util.listDatabases('local')
 
       expect(result.success).to.be.false
-      expect(result.error).to.include('Access denied')
+      // Reported verbatim: oclif already labels it, so a prefix here doubles up.
+      expect(result.error).to.equal('Access denied')
+    })
+  })
+
+  describe('listTables', () => {
+    it('returns list of tables', async () => {
+      mockPool.query.resolves([[{Tables_in_mydb: 'users'}, {Tables_in_mydb: 'orders'}], []])
+
+      const util = new MySQLUtil(mockConfig)
+      const result = await util.listTables('local')
+
+      expect(result.success).to.be.true
+      expect(result.data?.tables).to.deep.equal(['users', 'orders'])
+      expect(result.data?.result).to.include('users')
+    })
+
+    it('succeeds with an empty list when the database has no tables', async () => {
+      mockPool.query.resolves([[], []])
+
+      const util = new MySQLUtil(mockConfig)
+      const result = await util.listTables('local')
+
+      expect(result.success).to.be.true
+      expect(result.data?.tables).to.deep.equal([])
+      expect(result.data?.result).to.equal('No tables found in this database')
+    })
+
+    it('returns error on query failure', async () => {
+      mockPool.query.rejects(new Error('Access denied'))
+
+      const util = new MySQLUtil(mockConfig)
+      const result = await util.listTables('local')
+
+      expect(result.success).to.be.false
+      // Reported verbatim: oclif already labels it, so a prefix here doubles up.
+      expect(result.error).to.equal('Access denied')
     })
   })
 

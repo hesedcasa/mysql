@@ -14,12 +14,36 @@ type QueryWarning = {
   suggestion: string
 }
 
+// Escapes a config-supplied operation so it can be embedded in a pattern.
+function escapeForPattern(word: string): string {
+  return word.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`)
+}
+
+// Tests whether an operation appears in an already-uppercased query as whole
+// words, allowing any run of whitespace between the words of a multi-word
+// operation ("DROP  DATABASE", "DROP\nDATABASE").
+//
+// The scan deliberately covers the whole query rather than just the leading
+// keyword: a destructive keyword is worth flagging wherever it appears, and a
+// leading comment must not be able to hide one. Word boundaries stop the
+// reverse mistake, where `nowhere_stats` reads as a WHERE clause or
+// `limit_reached` as a LIMIT. A keyword inside a string literal still matches,
+// which errs toward asking for confirmation rather than skipping it.
+function containsOperation(normalizedQuery: string, operation: string): boolean {
+  const pattern = operation
+    .trim()
+    .split(/\s+/)
+    .map((word) => escapeForPattern(word))
+    .join(String.raw`\s+`)
+
+  return new RegExp(String.raw`\b${pattern}\b`, 'u').test(normalizedQuery)
+}
+
 export function checkBlacklist(query: string, blacklistedOperations: string[]): BlacklistCheckResult {
   const normalizedQuery = query.trim().toUpperCase()
 
   for (const operation of blacklistedOperations) {
-    const normalizedOp = operation.toUpperCase()
-    if (normalizedQuery.includes(normalizedOp)) {
+    if (containsOperation(normalizedQuery, operation.toUpperCase())) {
       return {
         allowed: false,
         reason: `Operation "${operation}" is blacklisted and not allowed`,
@@ -34,8 +58,7 @@ export function requiresConfirmation(query: string, confirmationOperations: stri
   const normalizedQuery = query.trim().toUpperCase()
 
   for (const operation of confirmationOperations) {
-    const normalizedOp = operation.toUpperCase()
-    if (normalizedQuery.startsWith(normalizedOp) || normalizedQuery.includes(` ${normalizedOp} `)) {
+    if (containsOperation(normalizedQuery, operation.toUpperCase())) {
       return {
         message: `This query contains a destructive operation: ${operation}`,
         required: true,
@@ -78,7 +101,7 @@ export function analyzeQuery(query: string): QueryWarning[] {
   // Check for missing WHERE clause in UPDATE/DELETE
   if (
     (normalizedQuery.startsWith('UPDATE') || normalizedQuery.startsWith('DELETE')) &&
-    !normalizedQuery.includes('WHERE')
+    !containsOperation(normalizedQuery, 'WHERE')
   ) {
     warnings.push({
       level: 'warning',
@@ -97,7 +120,7 @@ export function analyzeQuery(query: string): QueryWarning[] {
   }
 
   // Check for missing LIMIT in SELECT
-  if (normalizedQuery.startsWith('SELECT') && !normalizedQuery.includes('LIMIT')) {
+  if (normalizedQuery.startsWith('SELECT') && !containsOperation(normalizedQuery, 'LIMIT')) {
     warnings.push({
       level: 'info',
       message: 'SELECT query without LIMIT',
@@ -111,7 +134,7 @@ export function analyzeQuery(query: string): QueryWarning[] {
 export function applyDefaultLimit(query: string, defaultLimit: number): string {
   const normalizedQuery = query.trim().toUpperCase()
 
-  if (normalizedQuery.startsWith('SELECT') && !normalizedQuery.includes('LIMIT')) {
+  if (normalizedQuery.startsWith('SELECT') && !containsOperation(normalizedQuery, 'LIMIT')) {
     return `${query.trim()} LIMIT ${defaultLimit}`
   }
 

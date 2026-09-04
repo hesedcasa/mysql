@@ -27,6 +27,13 @@ npm run format
 
 # Find dead code
 npm run find-deadcode
+
+# End-to-end tests against MySQL in Docker (start, build, test, tear down)
+npm run test:e2e
+
+# Iterate on e2e tests without restarting the container
+npm run e2e:up && npm run build && npm run e2e:mocha
+npm run e2e:down
 ```
 
 ## Architecture
@@ -167,6 +174,21 @@ await cmd.run()
 ```
 
 **MySQL layer tests** (`test/mysql/mysql-utils.test.ts`) — stub `mysql.createPool` directly.
+
+**End-to-end tests** (`test/e2e/*.e2e.test.ts`) — no mocks. `docker/Dockerfile` provisions a
+MySQL 8.4 server seeded from `docker/initdb/`, and `test/e2e/helpers.ts` runs the built
+`bin/run.js` as a subprocess with `MQ_CONFIG_DIR` pointed at a temp config dir holding
+`default`, `alt` and `broken` profiles:
+
+```typescript
+const configDir = await createConfigDir()
+const payload = await runCliJson<{data: {tables: string[]}}>(['mysql', 'tables'], configDir)
+```
+
+`runCli` returns `{code, stdout, stderr}` without throwing (for failure-path assertions),
+`runCliOk` asserts a zero exit, and `runCliJson` appends `--json` and parses stdout. These
+files live in `test/e2e/`, which `npm test` skips via `--ignore` — they need a live
+server. Run them with `npm run test:e2e`; see `scripts/e2e.sh`.
 
 **Auth command tests** — mock `@inquirer/prompts` input function in `beforeEach` to avoid blocking on stdin:
 

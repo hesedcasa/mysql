@@ -69,13 +69,17 @@
     "postpack": "shx rm -f oclif.manifest.json",
     "posttest": "npm run lint",
     "prepack": "oclif manifest && oclif readme",
-    "test": "mocha --forbid-only \"test/**/*.test.ts\"",
+    "test": "mocha --forbid-only \"test/**/*.test.ts\" --ignore \"test/e2e/**\"",
     "test:coverage": "c8 npm test",
     "test:coverage:report": "c8 --reporter=html --reporter=text npm test",
     "version": "oclif readme && git add README.md",
     "find-deadcode": "ts-prune --ignore '(run|default)'",
     "format": "eslint --cache --fix --quiet . && prettier --write --cache .",
-    "pre-commit": "npm run format && npm run find-deadcode"
+    "pre-commit": "npm run format && npm run find-deadcode",
+    "test:e2e": "./scripts/e2e.sh",
+    "e2e:up": "docker compose -f docker/compose.yaml up -d --build --wait",
+    "e2e:down": "docker compose -f docker/compose.yaml down -v --remove-orphans",
+    "e2e:mocha": "mocha --forbid-only \"test/e2e/**/*.e2e.test.ts\""
   },
   "types": "dist/index.d.ts",
   "c8": {

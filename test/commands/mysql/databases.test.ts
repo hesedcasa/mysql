@@ -52,7 +52,7 @@ describe('mysql:databases', () => {
   })
 
   it('throws error when listing fails', async () => {
-    listDatabasesStub.resolves({error: 'ERROR: access denied', success: false})
+    listDatabasesStub.resolves({error: 'access denied', success: false})
 
     const cmd = new MySQLListDatabases([], {
       root: process.cwd(),

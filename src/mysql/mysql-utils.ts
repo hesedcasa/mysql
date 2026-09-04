@@ -79,7 +79,7 @@ export class MySQLUtil implements DatabaseUtil {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       return {
-        error: `ERROR: ${errorMessage}`,
+        error: errorMessage,
         success: false,
       }
     }
@@ -159,7 +159,7 @@ export class MySQLUtil implements DatabaseUtil {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       return {
-        error: `ERROR: ${errorMessage}`,
+        error: errorMessage,
         success: false,
       }
     }
@@ -182,7 +182,7 @@ export class MySQLUtil implements DatabaseUtil {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       return {
-        error: `ERROR: ${errorMessage}`,
+        error: errorMessage,
         success: false,
       }
     }
@@ -202,7 +202,7 @@ export class MySQLUtil implements DatabaseUtil {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       return {
-        error: `ERROR: ${errorMessage}`,
+        error: errorMessage,
         success: false,
       }
     }
@@ -213,6 +213,15 @@ export class MySQLUtil implements DatabaseUtil {
       const [rows] = await this.runQuery(profileName, 'SHOW TABLES')
 
       const rowsArray = rows as RowDataPacket[]
+      // SHOW TABLES names its one column after the database, so the key has to
+      // be read off a row — an empty schema has none.
+      if (rowsArray.length === 0) {
+        return {
+          data: {result: 'No tables found in this database', tables: []},
+          success: true,
+        }
+      }
+
       const tableKey = Object.keys(rowsArray[0])[0]
       const tables = rowsArray.map((row) => row[tableKey] as string)
 
@@ -226,7 +235,7 @@ export class MySQLUtil implements DatabaseUtil {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       return {
-        error: `ERROR: ${errorMessage}`,
+        error: errorMessage,
         success: false,
       }
     }
@@ -249,7 +258,7 @@ export class MySQLUtil implements DatabaseUtil {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       return {
-        error: `ERROR: ${errorMessage}`,
+        error: errorMessage,
         success: false,
       }
     }
@@ -271,7 +280,7 @@ export class MySQLUtil implements DatabaseUtil {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       return {
-        error: `ERROR: ${errorMessage}`,
+        error: errorMessage,
         success: false,
       }
     }
