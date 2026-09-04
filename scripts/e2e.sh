@@ -3,7 +3,11 @@
 #
 #   npm run test:e2e            # up -> build -> test -> down
 #   npm run test:e2e -- --keep  # leave the container running afterwards
-#   MQ_E2E_PORT=13307 npm run test:e2e
+#
+# Two runs can share a machine by giving each its own Compose project and
+# host port, so neither `down` tears down the other's container:
+#
+#   MQ_E2E_PROJECT=mq-e2e-b MQ_E2E_PORT=13307 npm run test:e2e
 #
 # Requires Docker with the Compose plugin.
 set -euo pipefail

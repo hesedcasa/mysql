@@ -26,6 +26,19 @@ describe('query-validator', () => {
       expect(checkBlacklist('DROP\n  DATABASE mydb', BLACKLIST).allowed).to.be.false
     })
 
+    it('blocks a blacklisted operation separated by a comment', () => {
+      // MySQL accepts a comment wherever whitespace is legal.
+      expect(checkBlacklist('DROP/**/DATABASE mydb', BLACKLIST).allowed).to.be.false
+      expect(checkBlacklist('DROP /* keep going */ DATABASE mydb', BLACKLIST).allowed).to.be.false
+      expect(checkBlacklist('DROP -- keep going\nDATABASE mydb', BLACKLIST).allowed).to.be.false
+      expect(checkBlacklist('DROP #keep going\nDATABASE mydb', BLACKLIST).allowed).to.be.false
+    })
+
+    it('blocks a blacklisted operation inside an executable comment', () => {
+      // MySQL runs the body of a /*! ... */ version comment.
+      expect(checkBlacklist('/*!40000 DROP DATABASE mydb */', BLACKLIST).allowed).to.be.false
+    })
+
     it('allows a query whose identifier merely contains the operation', () => {
       expect(checkBlacklist('SELECT * FROM drop_database_audit', BLACKLIST).allowed).to.be.true
     })
@@ -50,6 +63,11 @@ describe('query-validator', () => {
       expect(requiresConfirmation('SELECT * FROM users', CONFIRM).required).to.be.false
     })
 
+    it('does not treat an operation mentioned only in a comment as destructive', () => {
+      expect(requiresConfirmation('SELECT 1 -- DELETE FROM users', CONFIRM).required).to.be.false
+      expect(requiresConfirmation('SELECT 1 /* TRUNCATE TABLE users */', CONFIRM).required).to.be.false
+    })
+
     it('does not treat a column name containing an operation as destructive', () => {
       expect(requiresConfirmation('SELECT updated_at, deleted_at FROM users', CONFIRM).required).to.be.false
     })
@@ -64,6 +82,21 @@ describe('query-validator', () => {
 
     it('warns about a missing WHERE clause even when a table name contains "where"', () => {
       expect(messages('UPDATE nowhere_stats SET value = 1')).to.include('Missing WHERE clause in UPDATE/DELETE query')
+    })
+
+    it('warns about a missing WHERE clause when the only WHERE sits in a comment', () => {
+      expect(messages('UPDATE users SET name = 1 /* WHERE id = 1 */')).to.include(
+        'Missing WHERE clause in UPDATE/DELETE query',
+      )
+    })
+
+    it('does not mistake a comment marker inside a string literal for a comment', () => {
+      expect(messages("UPDATE notes SET body = '-- ' WHERE id = 1")).to.not.include(
+        'Missing WHERE clause in UPDATE/DELETE query',
+      )
+      expect(messages("UPDATE notes SET body = '#' WHERE id = 1")).to.not.include(
+        'Missing WHERE clause in UPDATE/DELETE query',
+      )
     })
 
     it('does not warn when a WHERE clause is present', () => {
@@ -83,12 +116,24 @@ describe('query-validator', () => {
 
   describe('applyDefaultLimit', () => {
     it('appends the default limit to an unbounded SELECT', () => {
-      expect(applyDefaultLimit('SELECT id FROM metrics', 100)).to.equal('SELECT id FROM metrics LIMIT 100')
+      expect(applyDefaultLimit('SELECT id FROM metrics', 100)).to.equal('SELECT id FROM metrics\nLIMIT 100')
     })
 
     it('appends the default limit when a column name contains "limit"', () => {
       expect(applyDefaultLimit('SELECT limit_reached FROM metrics', 100)).to.equal(
-        'SELECT limit_reached FROM metrics LIMIT 100',
+        'SELECT limit_reached FROM metrics\nLIMIT 100',
+      )
+    })
+
+    it('appends the default limit when the only LIMIT sits in a comment', () => {
+      expect(applyDefaultLimit('SELECT id FROM metrics /* LIMIT 5 */', 100)).to.equal(
+        'SELECT id FROM metrics /* LIMIT 5 */\nLIMIT 100',
+      )
+    })
+
+    it('appends the default limit on its own line so a trailing comment cannot swallow it', () => {
+      expect(applyDefaultLimit('SELECT id FROM metrics -- all of them', 100)).to.equal(
+        'SELECT id FROM metrics -- all of them\nLIMIT 100',
       )
     })
 

@@ -19,16 +19,102 @@ function escapeForPattern(word: string): string {
   return word.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`)
 }
 
-// Tests whether an operation appears in an already-uppercased query as whole
+// String literals ('...', "...") and quoted identifiers (`...`).
+const QUOTE_CHARS = new Set(['"', "'", '`'])
+
+// Returns the index just past the quoted run that starts at `start`, so the
+// caller can copy a string literal or quoted identifier through untouched. An
+// unterminated quote swallows the rest of the query, which keeps any keyword it
+// hides visible to the safety checks.
+function findQuoteEnd(query: string, start: number): number {
+  const quote = query[start]
+
+  for (let index = start + 1; index < query.length; index += 1) {
+    // Backslash escapes apply inside string literals but not inside `identifiers`.
+    if (quote !== '`' && query[index] === '\\') {
+      index += 1
+      continue
+    }
+
+    if (query[index] === quote) {
+      // A doubled quote is an escaped quote, not the end of the run.
+      if (query[index + 1] === quote) {
+        index += 1
+        continue
+      }
+
+      return index + 1
+    }
+  }
+
+  return query.length
+}
+
+// Replaces every non-executable MySQL comment with a single space, so keyword
+// matching sees `DROP /* here */ DATABASE` for what MySQL sees: `DROP DATABASE`.
+// The scan is quote aware — `--`, `#` and `/*` inside a string literal or a
+// quoted identifier are data, not the start of a comment.
+//
+// `/*! ... */` and `/*+ ... */` keep their bodies: MySQL executes version
+// comments and reads optimizer hints, so their contents are real SQL.
+function stripComments(query: string): string {
+  let stripped = ''
+  let index = 0
+
+  while (index < query.length) {
+    const char = query[index]
+
+    if (QUOTE_CHARS.has(char)) {
+      const end = findQuoteEnd(query, index)
+      stripped += query.slice(index, end)
+      index = end
+      continue
+    }
+
+    if (char === '/' && query[index + 1] === '*') {
+      const executable = query[index + 2] === '!' || query[index + 2] === '+'
+      const close = query.indexOf('*/', index + 2)
+      const end = close === -1 ? query.length : close + 2
+      stripped += executable ? query.slice(index, end) : ' '
+      index = end
+      continue
+    }
+
+    // `--` only opens a comment when whitespace (or the end of the query)
+    // follows it; `a--b` is two minus signs.
+    const dashComment = char === '-' && query[index + 1] === '-' && /^\s*$/u.test(query[index + 2] ?? '')
+
+    if (char === '#' || dashComment) {
+      const newline = query.indexOf('\n', index)
+      stripped += ' '
+      index = newline === -1 ? query.length : newline
+      continue
+    }
+
+    stripped += char
+    index += 1
+  }
+
+  return stripped
+}
+
+// Strips comments, then trims and upper-cases what is left, giving the checks
+// below a single view of the SQL MySQL would actually execute.
+function normalize(query: string): string {
+  return stripComments(query).trim().toUpperCase()
+}
+
+// Tests whether an operation appears in an already-normalized query as whole
 // words, allowing any run of whitespace between the words of a multi-word
-// operation ("DROP  DATABASE", "DROP\nDATABASE").
+// operation ("DROP  DATABASE", "DROP\nDATABASE"). Comments are gone by this
+// point, so a comment between those words no longer hides the operation.
 //
 // The scan deliberately covers the whole query rather than just the leading
-// keyword: a destructive keyword is worth flagging wherever it appears, and a
-// leading comment must not be able to hide one. Word boundaries stop the
-// reverse mistake, where `nowhere_stats` reads as a WHERE clause or
-// `limit_reached` as a LIMIT. A keyword inside a string literal still matches,
-// which errs toward asking for confirmation rather than skipping it.
+// keyword: a destructive keyword is worth flagging wherever it appears. Word
+// boundaries stop the reverse mistake, where `nowhere_stats` reads as a WHERE
+// clause or `limit_reached` as a LIMIT. A keyword inside a string literal still
+// matches, which errs toward asking for confirmation rather than skipping it —
+// and keeps `PREPARE s FROM 'DROP DATABASE x'` in reach of the blacklist.
 function containsOperation(normalizedQuery: string, operation: string): boolean {
   const pattern = operation
     .trim()
@@ -40,7 +126,7 @@ function containsOperation(normalizedQuery: string, operation: string): boolean 
 }
 
 export function checkBlacklist(query: string, blacklistedOperations: string[]): BlacklistCheckResult {
-  const normalizedQuery = query.trim().toUpperCase()
+  const normalizedQuery = normalize(query)
 
   for (const operation of blacklistedOperations) {
     if (containsOperation(normalizedQuery, operation.toUpperCase())) {
@@ -55,7 +141,7 @@ export function checkBlacklist(query: string, blacklistedOperations: string[]): 
 }
 
 export function requiresConfirmation(query: string, confirmationOperations: string[]): ConfirmationCheckResult {
-  const normalizedQuery = query.trim().toUpperCase()
+  const normalizedQuery = normalize(query)
 
   for (const operation of confirmationOperations) {
     if (containsOperation(normalizedQuery, operation.toUpperCase())) {
@@ -70,7 +156,7 @@ export function requiresConfirmation(query: string, confirmationOperations: stri
 }
 
 export function getQueryType(query: string): string {
-  const normalizedQuery = query.trim().toUpperCase()
+  const normalizedQuery = normalize(query)
   const firstWord = normalizedQuery.split(/\s+/, 1)[0]
 
   const knownTypes = [
@@ -96,7 +182,7 @@ export function getQueryType(query: string): string {
 
 export function analyzeQuery(query: string): QueryWarning[] {
   const warnings: QueryWarning[] = []
-  const normalizedQuery = query.trim().toUpperCase()
+  const normalizedQuery = normalize(query)
 
   // Check for missing WHERE clause in UPDATE/DELETE
   if (
@@ -132,10 +218,11 @@ export function analyzeQuery(query: string): QueryWarning[] {
 }
 
 export function applyDefaultLimit(query: string, defaultLimit: number): string {
-  const normalizedQuery = query.trim().toUpperCase()
+  const normalizedQuery = normalize(query)
 
   if (normalizedQuery.startsWith('SELECT') && !containsOperation(normalizedQuery, 'LIMIT')) {
-    return `${query.trim()} LIMIT ${defaultLimit}`
+    // On its own line: a trailing `-- comment` would otherwise swallow it.
+    return `${query.trim()}\nLIMIT ${defaultLimit}`
   }
 
   return query

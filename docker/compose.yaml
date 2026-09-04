@@ -2,7 +2,10 @@
 #
 #   docker compose -f docker/compose.yaml up -d --wait
 #   docker compose -f docker/compose.yaml down -v
-name: mq-e2e
+#
+# Both the project name and the host port are overridable, so two runs can
+# share a machine: MQ_E2E_PROJECT=mq-e2e-b MQ_E2E_PORT=13307 npm run test:e2e
+name: ${MQ_E2E_PROJECT:-mq-e2e}
 
 services:
   mysql:
@@ -10,7 +13,6 @@ services:
       context: .
       dockerfile: Dockerfile
     image: mq-e2e-mysql:latest
-    container_name: mq-e2e-mysql
     ports:
       # Host port is overridable so the container never fights a local MySQL.
       - '${MQ_E2E_PORT:-13306}:3306'
