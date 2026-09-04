@@ -50,8 +50,11 @@ function findQuoteEnd(query: string, start: number): number {
   return query.length
 }
 
-// Replaces every non-executable MySQL comment with a single space, so keyword
-// matching sees `DROP /* here */ DATABASE` for what MySQL sees: `DROP DATABASE`.
+// Walks the query, yielding each stretch of it alongside the text MySQL would
+// actually execute there. Code and quoted runs come through untouched; an
+// ordinary comment collapses to a single space, so keyword matching sees
+// `DROP /* here */ DATABASE` for what MySQL sees: `DROP DATABASE`.
+//
 // The scan is quote aware — `--`, `#` and `/*` inside a string literal or a
 // quoted identifier are data, not the start of a comment.
 //
@@ -60,8 +63,7 @@ function findQuoteEnd(query: string, start: number): number {
 // whitespace, so `DROP /*!40000 */ DATABASE` reads as `DROP DATABASE` here too.
 // A `/*+ ... */` hint comment goes entirely, like any other comment: its body
 // is hint syntax, never SQL MySQL would run.
-function stripComments(query: string): string {
-  let stripped = ''
+function* scanQuery(query: string): Generator<{executable: string; start: number}> {
   let index = 0
 
   while (index < query.length) {
@@ -69,7 +71,7 @@ function stripComments(query: string): string {
 
     if (QUOTE_CHARS.has(char)) {
       const end = findQuoteEnd(query, index)
-      stripped += query.slice(index, end)
+      yield {executable: query.slice(index, end), start: index}
       index = end
       continue
     }
@@ -79,7 +81,7 @@ function stripComments(query: string): string {
       const end = close === -1 ? query.length : close + 2
       const body = query.slice(index + 3, close === -1 ? query.length : close)
       const versionComment = query[index + 2] === '!'
-      stripped += versionComment ? ` ${body.replace(/^\d{5}/u, ' ')} ` : ' '
+      yield {executable: versionComment ? ` ${body.replace(/^\d{5}/u, ' ')} ` : ' ', start: index}
       index = end
       continue
     }
@@ -90,16 +92,45 @@ function stripComments(query: string): string {
 
     if (char === '#' || dashComment) {
       const newline = query.indexOf('\n', index)
-      stripped += ' '
+      yield {executable: ' ', start: index}
       index = newline === -1 ? query.length : newline
       continue
     }
 
-    stripped += char
+    yield {executable: char, start: index}
     index += 1
+  }
+}
+
+// Replaces every non-executable MySQL comment with a single space.
+function stripComments(query: string): string {
+  let stripped = ''
+
+  for (const {executable} of scanQuery(query)) {
+    stripped += executable
   }
 
   return stripped
+}
+
+// Index of the `;` that terminates the query's single statement — the last one
+// with nothing but whitespace and comments after it — or -1 when the query is
+// not terminated. A `;` inside a string literal or a comment is not a
+// terminator, because MySQL does not execute it as one.
+function findTrailingTerminator(query: string): number {
+  let terminator = -1
+
+  for (const {executable, start} of scanQuery(query)) {
+    if (executable === ';') {
+      terminator = start
+    } else if (/\S/u.test(executable)) {
+      // Executable text after a `;` means that `;` separated statements rather
+      // than ending the query.
+      terminator = -1
+    }
+  }
+
+  return terminator
 }
 
 // Strips comments, then trims and upper-cases what is left, giving the checks
@@ -224,10 +255,19 @@ export function analyzeQuery(query: string): QueryWarning[] {
 export function applyDefaultLimit(query: string, defaultLimit: number): string {
   const normalizedQuery = normalize(query)
 
-  if (normalizedQuery.startsWith('SELECT') && !containsOperation(normalizedQuery, 'LIMIT')) {
-    // On its own line: a trailing `-- comment` would otherwise swallow it.
+  if (!normalizedQuery.startsWith('SELECT') || containsOperation(normalizedQuery, 'LIMIT')) {
+    return query
+  }
+
+  const terminator = findTrailingTerminator(query)
+
+  // On its own line either way: a trailing `-- comment` would otherwise swallow
+  // the LIMIT.
+  if (terminator === -1) {
     return `${query.trim()}\nLIMIT ${defaultLimit}`
   }
 
-  return query
+  // The LIMIT has to go in front of the terminator. After it, MySQL reads
+  // `LIMIT 100` as a second statement and rejects the whole query.
+  return `${query.slice(0, terminator).trim()}\nLIMIT ${defaultLimit}\n${query.slice(terminator).trim()}`
 }

@@ -146,6 +146,20 @@ describe('query-validator', () => {
       )
     })
 
+    it('inserts the default limit before a trailing semicolon', () => {
+      expect(applyDefaultLimit('SELECT id FROM metrics;', 100)).to.equal('SELECT id FROM metrics\nLIMIT 100\n;')
+    })
+
+    it('inserts the default limit before a semicolon trailed by a comment', () => {
+      expect(applyDefaultLimit('SELECT id FROM metrics; -- done', 100)).to.equal(
+        'SELECT id FROM metrics\nLIMIT 100\n; -- done',
+      )
+    })
+
+    it('appends the default limit when the only semicolon is inside a string literal', () => {
+      expect(applyDefaultLimit("SELECT ';' FROM metrics", 100)).to.equal("SELECT ';' FROM metrics\nLIMIT 100")
+    })
+
     it('leaves an explicit LIMIT alone', () => {
       expect(applyDefaultLimit('SELECT id FROM metrics LIMIT 5', 100)).to.equal('SELECT id FROM metrics LIMIT 5')
     })

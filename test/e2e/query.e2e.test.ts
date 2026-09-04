@@ -71,6 +71,23 @@ describe('e2e: query execution', () => {
     expect(payload.data.result).to.have.lengthOf(100)
   })
 
+  it('applies the default LIMIT to a semicolon-terminated SELECT', async () => {
+    // The appended LIMIT has to land in front of the `;`. Behind it, MySQL
+    // parses `LIMIT 100` as a second statement and rejects the query.
+    const payload = await runCliJson<{data: {result: Row[]}}>(['mysql', 'query', 'SELECT id FROM metrics;'], configDir)
+
+    expect(payload.data.result).to.have.lengthOf(100)
+  })
+
+  it('applies the default LIMIT when a comment trails the semicolon', async () => {
+    const payload = await runCliJson<{data: {result: Row[]}}>(
+      ['mysql', 'query', 'SELECT id FROM metrics; -- every row'],
+      configDir,
+    )
+
+    expect(payload.data.result).to.have.lengthOf(100)
+  })
+
   it('leaves an explicit LIMIT alone', async () => {
     const payload = await runCliJson<{data: {result: Row[]}}>(
       ['mysql', 'query', 'SELECT id FROM metrics LIMIT 120'],
