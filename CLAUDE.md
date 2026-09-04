@@ -190,6 +190,12 @@ const payload = await runCliJson<{data: {tables: string[]}}>(['mysql', 'tables']
 files live in `test/e2e/`, which `npm test` skips via `--ignore` — they need a live
 server. Run them with `npm run test:e2e`; see `scripts/e2e.sh`.
 
+Each `npm run test:e2e` gets its own Compose project (`mq-e2e-<pid>`) and lets Docker
+publish MySQL on a free host port, so concurrent runs never share a database or tear down
+each other's container. `MQ_E2E_PROJECT` and `MQ_E2E_PORT` override both; `e2e:up` /
+`e2e:down` use the defaults (`mq-e2e` on 13306), which is why they pair with `e2e:mocha`.
+Give concurrent runs separate working trees, though — the build writes a single `dist/`.
+
 **Auth command tests** — mock `@inquirer/prompts` input function in `beforeEach` to avoid blocking on stdin:
 
 ```typescript

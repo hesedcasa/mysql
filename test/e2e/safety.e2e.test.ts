@@ -75,6 +75,21 @@ describe('e2e: safety rules and writes', () => {
     expect(payload.data.databases).to.include('mq_e2e_alt')
   })
 
+  it('blocks a blacklisted operation separated by an executable comment', async () => {
+    // MySQL strips `/*!` and its version number before executing, so this is a
+    // real `DROP DATABASE` — even with the confirmation prompt waived.
+    const {code, stderr} = await runCli(
+      ['mysql', 'query', 'DROP /*!40000 */ DATABASE mq_e2e_alt', '--skip-confirmation'],
+      configDir,
+    )
+
+    expect(code).to.not.equal(0)
+    expect(stderr).to.include('"DROP DATABASE" is blacklisted')
+
+    const payload = await runCliJson<{data: {databases: string[]}}>(['mysql', 'databases'], configDir)
+    expect(payload.data.databases).to.include('mq_e2e_alt')
+  })
+
   it('requires confirmation when a leading comment pushes the operation onto its own line', async () => {
     // Runs against a scratch table: if the guard ever regresses, the DELETE
     // executes, and it must not be able to touch the seeded fixtures.

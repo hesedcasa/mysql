@@ -3,8 +3,9 @@
 #   docker compose -f docker/compose.yaml up -d --wait
 #   docker compose -f docker/compose.yaml down -v
 #
-# Both the project name and the host port are overridable, so two runs can
-# share a machine: MQ_E2E_PROJECT=mq-e2e-b MQ_E2E_PORT=13307 npm run test:e2e
+# Both the project name and the host port are overridable, so two runs can share
+# a machine. `scripts/e2e.sh` sets them per run; the `e2e:up` / `e2e:down`
+# scripts stay on the defaults below, which is what makes them a pair.
 name: ${MQ_E2E_PROJECT:-mq-e2e}
 
 services:
@@ -14,7 +15,8 @@ services:
       dockerfile: Dockerfile
     image: mq-e2e-mysql:latest
     ports:
-      # Host port is overridable so the container never fights a local MySQL.
+      # Host port is overridable so the container never fights a local MySQL;
+      # `scripts/e2e.sh` passes 0, which lets Docker pick a free one.
       - '${MQ_E2E_PORT:-13306}:3306'
     tmpfs:
       # Data lives in RAM: fast startup, and every `up` is a clean database.

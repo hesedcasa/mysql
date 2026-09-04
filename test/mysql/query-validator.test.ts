@@ -39,6 +39,15 @@ describe('query-validator', () => {
       expect(checkBlacklist('/*!40000 DROP DATABASE mydb */', BLACKLIST).allowed).to.be.false
     })
 
+    it('blocks a blacklisted operation separated by an executable comment', () => {
+      // MySQL drops the `/*!` and its optional version number before executing,
+      // and ignores a hint comment it cannot use, so each of these reaches the
+      // server as `DROP DATABASE mydb`.
+      expect(checkBlacklist('DROP /*!40000 */ DATABASE mydb', BLACKLIST).allowed).to.be.false
+      expect(checkBlacklist('DROP /*! */ DATABASE mydb', BLACKLIST).allowed).to.be.false
+      expect(checkBlacklist('DROP /*+ MAX_EXECUTION_TIME(1) */ DATABASE mydb', BLACKLIST).allowed).to.be.false
+    })
+
     it('allows a query whose identifier merely contains the operation', () => {
       expect(checkBlacklist('SELECT * FROM drop_database_audit', BLACKLIST).allowed).to.be.true
     })

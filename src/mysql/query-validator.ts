@@ -55,8 +55,11 @@ function findQuoteEnd(query: string, start: number): number {
 // The scan is quote aware — `--`, `#` and `/*` inside a string literal or a
 // quoted identifier are data, not the start of a comment.
 //
-// `/*! ... */` and `/*+ ... */` keep their bodies: MySQL executes version
-// comments and reads optimizer hints, so their contents are real SQL.
+// A `/*! ... */` version comment keeps its body, because MySQL executes it —
+// only the `/*!`, its optional five-digit version and the closing `*/` become
+// whitespace, so `DROP /*!40000 */ DATABASE` reads as `DROP DATABASE` here too.
+// A `/*+ ... */` hint comment goes entirely, like any other comment: its body
+// is hint syntax, never SQL MySQL would run.
 function stripComments(query: string): string {
   let stripped = ''
   let index = 0
@@ -72,10 +75,11 @@ function stripComments(query: string): string {
     }
 
     if (char === '/' && query[index + 1] === '*') {
-      const executable = query[index + 2] === '!' || query[index + 2] === '+'
       const close = query.indexOf('*/', index + 2)
       const end = close === -1 ? query.length : close + 2
-      stripped += executable ? query.slice(index, end) : ' '
+      const body = query.slice(index + 3, close === -1 ? query.length : close)
+      const versionComment = query[index + 2] === '!'
+      stripped += versionComment ? ` ${body.replace(/^\d{5}/u, ' ')} ` : ' '
       index = end
       continue
     }

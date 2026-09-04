@@ -4,10 +4,15 @@
 #   npm run test:e2e            # up -> build -> test -> down
 #   npm run test:e2e -- --keep  # leave the container running afterwards
 #
-# Two runs can share a machine by giving each its own Compose project and
-# host port, so neither `down` tears down the other's container:
+# Every run gets its own Compose project and a host port Docker picks, so
+# concurrent runs neither share a database nor tear down each other's container
+# on the way out. Pin either one to reuse a specific server:
 #
 #   MQ_E2E_PROJECT=mq-e2e-b MQ_E2E_PORT=13307 npm run test:e2e
+#
+# Two runs still need separate working trees (a second checkout or a git
+# worktree): the build step below writes one `dist/`, which both would rebuild
+# from under each other.
 #
 # Requires Docker with the Compose plugin.
 set -euo pipefail
@@ -30,18 +35,36 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
+# The PID keeps each run in its own Compose project, so the `down` below can
+# only ever remove the container this run started. Port 0 hands the choice of
+# host port to Docker, which is race-free in a way probing for a free port from
+# here is not: two runs starting together would both find the same port open.
+export MQ_E2E_PROJECT="${MQ_E2E_PROJECT:-mq-e2e-$$}"
+export MQ_E2E_PORT="${MQ_E2E_PORT:-0}"
+
 cleanup() {
   if [ "$KEEP" -eq 0 ]; then
     echo "==> Stopping MySQL container"
     docker compose -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
   else
-    echo "==> Leaving MySQL container up (--keep); stop it with: npm run e2e:down"
+    echo "==> Leaving MySQL container up (--keep). Reuse it with:"
+    echo "      MQ_E2E_PROJECT=$MQ_E2E_PROJECT MQ_E2E_PORT=$MQ_E2E_PORT npm run e2e:mocha"
+    echo "    Stop it with:"
+    echo "      MQ_E2E_PROJECT=$MQ_E2E_PROJECT npm run e2e:down"
   fi
 }
 trap cleanup EXIT
 
-echo "==> Starting MySQL on port ${MQ_E2E_PORT:-13306}"
+echo "==> Starting MySQL (project $MQ_E2E_PROJECT)"
 docker compose -f "$COMPOSE_FILE" up -d --build --wait
+
+if [ "$MQ_E2E_PORT" = "0" ]; then
+  # Ask Docker which host port it published, so the tests can connect to it.
+  MQ_E2E_PORT="$(docker compose -f "$COMPOSE_FILE" port mysql 3306 | sed 's/.*://')"
+  export MQ_E2E_PORT
+fi
+
+echo "==> MySQL is listening on port $MQ_E2E_PORT"
 
 echo "==> Building the CLI"
 npm run build
