@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/hesedcasa/mysql/compare/v0.6.1...v0.6.2) (2026-09-05)
+
+
+### 🛠️ Fixes
+
+* close query-safety gaps and stop doubling error prefixes ([#92](https://github.com/hesedcasa/mysql/issues/92)) ([4b1ce53](https://github.com/hesedcasa/mysql/commit/4b1ce53bd0b8367d9ceddcc9993bf99493c6759a))
+
 ## [0.6.1](https://github.com/hesedcasa/mysql/compare/v0.6.0...v0.6.1) (2026-08-13)
 
 
