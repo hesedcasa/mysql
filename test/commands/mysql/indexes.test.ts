@@ -56,7 +56,7 @@ describe('mysql:indexes', () => {
   })
 
   it('throws error when show indexes fails', async () => {
-    showIndexesStub.resolves({error: "ERROR: Table 'mydb.nope' doesn't exist", success: false})
+    showIndexesStub.resolves({error: "Table 'mydb.nope' doesn't exist", success: false})
 
     const cmd = new MySQLShowIndexes(['nope'], {
       root: process.cwd(),

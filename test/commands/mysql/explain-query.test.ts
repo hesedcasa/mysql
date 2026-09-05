@@ -60,7 +60,7 @@ describe('mysql:explain-query', () => {
   })
 
   it('throws error when explain fails', async () => {
-    explainQueryStub.resolves({error: 'ERROR: You have an error in your SQL syntax', success: false})
+    explainQueryStub.resolves({error: 'You have an error in your SQL syntax', success: false})
 
     const cmd = new MySQLExplainQuery(['INVALID SQL'], {
       root: process.cwd(),

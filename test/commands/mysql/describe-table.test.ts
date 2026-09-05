@@ -53,7 +53,7 @@ describe('mysql:describe-table', () => {
   })
 
   it('throws error when describe fails', async () => {
-    describeTableStub.resolves({error: "ERROR: Table 'mydb.nope' doesn't exist", success: false})
+    describeTableStub.resolves({error: "Table 'mydb.nope' doesn't exist", success: false})
 
     const cmd = new MySQLDescribeTable(['nope'], {
       root: process.cwd(),

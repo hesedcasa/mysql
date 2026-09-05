@@ -95,7 +95,7 @@ describe('mysql:query', () => {
   })
 
   it('throws error when query fails', async () => {
-    executeQueryStub.resolves({data: undefined, error: 'ERROR: table not found', success: false})
+    executeQueryStub.resolves({data: undefined, error: 'table not found', success: false})
 
     const cmd = new MySQLQuery(['SELECT * FROM nonexistent'], {
       root: process.cwd(),
