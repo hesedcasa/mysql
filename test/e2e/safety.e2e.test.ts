@@ -90,6 +90,21 @@ describe('e2e: safety rules and writes', () => {
     expect(payload.data.databases).to.include('mq_e2e_alt')
   })
 
+  it('blocks a blacklisted operation separated by a six-digit executable comment', async () => {
+    // MySQL 8.4 reads a five- OR six-digit version, so `080000` is consumed
+    // whole and the server really does run `DROP DATABASE mq_e2e_alt`.
+    const {code, stderr} = await runCli(
+      ['mysql', 'query', 'DROP /*!080000 */ DATABASE mq_e2e_alt', '--skip-confirmation'],
+      configDir,
+    )
+
+    expect(code).to.not.equal(0)
+    expect(stderr).to.include('"DROP DATABASE" is blacklisted')
+
+    const payload = await runCliJson<{data: {databases: string[]}}>(['mysql', 'databases'], configDir)
+    expect(payload.data.databases).to.include('mq_e2e_alt')
+  })
+
   it('requires confirmation when a leading comment pushes the operation onto its own line', async () => {
     // Runs against a scratch table: if the guard ever regresses, the DELETE
     // executes, and it must not be able to touch the seeded fixtures.

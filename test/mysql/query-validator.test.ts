@@ -48,6 +48,19 @@ describe('query-validator', () => {
       expect(checkBlacklist('DROP /*+ MAX_EXECUTION_TIME(1) */ DATABASE mydb', BLACKLIST).allowed).to.be.false
     })
 
+    it('blocks a blacklisted operation separated by a six-digit executable comment', () => {
+      // MySQL 8.4 reads a five- OR six-digit version, so it consumes `080411`
+      // whole and executes what follows as `DROP DATABASE mydb`.
+      expect(checkBlacklist('DROP /*!080411 */ DATABASE mydb', BLACKLIST).allowed).to.be.false
+      expect(checkBlacklist('DROP /*!080411*/DATABASE mydb', BLACKLIST).allowed).to.be.false
+    })
+
+    it('blocks a blacklisted operation hidden in a string literal', () => {
+      // The blacklist keeps quoted text on purpose: a literal can still reach
+      // the server as SQL, and over-blocking is the safe direction here.
+      expect(checkBlacklist("PREPARE stmt FROM 'DROP DATABASE mydb'", BLACKLIST).allowed).to.be.false
+    })
+
     it('allows a query whose identifier merely contains the operation', () => {
       expect(checkBlacklist('SELECT * FROM drop_database_audit', BLACKLIST).allowed).to.be.true
     })
@@ -108,6 +121,12 @@ describe('query-validator', () => {
       )
     })
 
+    it('warns about a missing WHERE clause when the only WHERE sits in a string literal', () => {
+      expect(messages("UPDATE notes SET body = 'WHERE id = 1'")).to.include(
+        'Missing WHERE clause in UPDATE/DELETE query',
+      )
+    })
+
     it('does not warn when a WHERE clause is present', () => {
       expect(messages('UPDATE users SET name = 1 WHERE id = 2')).to.not.include(
         'Missing WHERE clause in UPDATE/DELETE query',
@@ -116,6 +135,14 @@ describe('query-validator', () => {
 
     it('warns about a SELECT with no LIMIT even when a column contains "limit"', () => {
       expect(messages('SELECT limit_reached FROM metrics')).to.include('SELECT query without LIMIT')
+    })
+
+    it('warns about a SELECT whose only LIMIT sits in a string literal', () => {
+      expect(messages("SELECT 'LIMIT 5' FROM metrics")).to.include('SELECT query without LIMIT')
+    })
+
+    it('warns about a SELECT whose only LIMIT is a quoted identifier', () => {
+      expect(messages('SELECT `limit` FROM metrics')).to.include('SELECT query without LIMIT')
     })
 
     it('does not warn when a LIMIT is present', () => {
@@ -138,6 +165,16 @@ describe('query-validator', () => {
       expect(applyDefaultLimit('SELECT id FROM metrics /* LIMIT 5 */', 100)).to.equal(
         'SELECT id FROM metrics /* LIMIT 5 */\nLIMIT 100',
       )
+    })
+
+    it('appends the default limit when the only LIMIT sits in a string literal', () => {
+      expect(applyDefaultLimit("SELECT 'LIMIT 5' FROM metrics", 100)).to.equal(
+        "SELECT 'LIMIT 5' FROM metrics\nLIMIT 100",
+      )
+    })
+
+    it('appends the default limit when the only LIMIT is a quoted identifier', () => {
+      expect(applyDefaultLimit('SELECT `limit` FROM metrics', 100)).to.equal('SELECT `limit` FROM metrics\nLIMIT 100')
     })
 
     it('appends the default limit on its own line so a trailing comment cannot swallow it', () => {

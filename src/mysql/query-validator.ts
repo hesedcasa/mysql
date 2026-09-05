@@ -59,11 +59,18 @@ function findQuoteEnd(query: string, start: number): number {
 // quoted identifier are data, not the start of a comment.
 //
 // A `/*! ... */` version comment keeps its body, because MySQL executes it —
-// only the `/*!`, its optional five-digit version and the closing `*/` become
+// only the `/*!`, its leading version digits and the closing `*/` become
 // whitespace, so `DROP /*!40000 */ DATABASE` reads as `DROP DATABASE` here too.
+// MySQL 8.4 consumes a five- or six-digit version (`/*!080411 */` runs), and
+// any other digit run it executes as part of the body, where it can only turn
+// the statement into a syntax error — so every leading digit goes, whatever the
+// server's rule for them is.
 // A `/*+ ... */` hint comment goes entirely, like any other comment: its body
 // is hint syntax, never SQL MySQL would run.
-function* scanQuery(query: string): Generator<{executable: string; start: number}> {
+//
+// `quoted` marks a string literal or quoted identifier, so a caller that cares
+// about clause structure rather than raw text can blank it out.
+function* scanQuery(query: string): Generator<{executable: string; quoted: boolean; start: number}> {
   let index = 0
 
   while (index < query.length) {
@@ -71,7 +78,7 @@ function* scanQuery(query: string): Generator<{executable: string; start: number
 
     if (QUOTE_CHARS.has(char)) {
       const end = findQuoteEnd(query, index)
-      yield {executable: query.slice(index, end), start: index}
+      yield {executable: query.slice(index, end), quoted: true, start: index}
       index = end
       continue
     }
@@ -81,7 +88,7 @@ function* scanQuery(query: string): Generator<{executable: string; start: number
       const end = close === -1 ? query.length : close + 2
       const body = query.slice(index + 3, close === -1 ? query.length : close)
       const versionComment = query[index + 2] === '!'
-      yield {executable: versionComment ? ` ${body.replace(/^\d{5}/u, ' ')} ` : ' ', start: index}
+      yield {executable: versionComment ? ` ${body.replace(/^\d+/u, ' ')} ` : ' ', quoted: false, start: index}
       index = end
       continue
     }
@@ -92,22 +99,23 @@ function* scanQuery(query: string): Generator<{executable: string; start: number
 
     if (char === '#' || dashComment) {
       const newline = query.indexOf('\n', index)
-      yield {executable: ' ', start: index}
+      yield {executable: ' ', quoted: false, start: index}
       index = newline === -1 ? query.length : newline
       continue
     }
 
-    yield {executable: char, start: index}
+    yield {executable: char, quoted: false, start: index}
     index += 1
   }
 }
 
-// Replaces every non-executable MySQL comment with a single space.
-function stripComments(query: string): string {
+// Replaces every non-executable MySQL comment with a single space, and every
+// string literal or quoted identifier too when `blankQuoted` is set.
+function stripComments(query: string, blankQuoted = false): string {
   let stripped = ''
 
-  for (const {executable} of scanQuery(query)) {
-    stripped += executable
+  for (const {executable, quoted} of scanQuery(query)) {
+    stripped += blankQuoted && quoted ? ' ' : executable
   }
 
   return stripped
@@ -134,9 +142,20 @@ function findTrailingTerminator(query: string): number {
 }
 
 // Strips comments, then trims and upper-cases what is left, giving the checks
-// below a single view of the SQL MySQL would actually execute.
+// below a single view of the SQL MySQL would actually execute. Quoted text
+// stays, so a keyword hidden in a string literal is still visible.
 function normalize(query: string): string {
   return stripComments(query).trim().toUpperCase()
+}
+
+// The same view with every string literal and quoted identifier blanked out.
+// Clause detection asks a structural question — does this statement have a
+// WHERE, does it have a LIMIT — and `SELECT 'LIMIT 5' FROM metrics` has neither,
+// so keeping the quoted text there would drop the row cap off a query that is
+// in fact unbounded. The blacklist and confirmation checks ask the opposite
+// question and keep quoted text on purpose.
+function normalizeClauses(query: string): string {
+  return stripComments(query, true).trim().toUpperCase()
 }
 
 // Tests whether an operation appears in an already-normalized query as whole
@@ -217,7 +236,7 @@ export function getQueryType(query: string): string {
 
 export function analyzeQuery(query: string): QueryWarning[] {
   const warnings: QueryWarning[] = []
-  const normalizedQuery = normalize(query)
+  const normalizedQuery = normalizeClauses(query)
 
   // Check for missing WHERE clause in UPDATE/DELETE
   if (
@@ -253,7 +272,7 @@ export function analyzeQuery(query: string): QueryWarning[] {
 }
 
 export function applyDefaultLimit(query: string, defaultLimit: number): string {
-  const normalizedQuery = normalize(query)
+  const normalizedQuery = normalizeClauses(query)
 
   if (!normalizedQuery.startsWith('SELECT') || containsOperation(normalizedQuery, 'LIMIT')) {
     return query

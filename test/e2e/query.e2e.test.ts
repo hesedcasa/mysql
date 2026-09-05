@@ -71,6 +71,25 @@ describe('e2e: query execution', () => {
     expect(payload.data.result).to.have.lengthOf(100)
   })
 
+  it('applies the default LIMIT when a string literal reads as a LIMIT clause', async () => {
+    // The literal is not a clause: without the cap this returns all 150 rows.
+    const payload = await runCliJson<{data: {result: Row[]}}>(
+      ['mysql', 'query', "SELECT id, 'LIMIT 5' AS tag FROM metrics"],
+      configDir,
+    )
+
+    expect(payload.data.result).to.have.lengthOf(100)
+  })
+
+  it('applies the default LIMIT when a quoted identifier is named "limit"', async () => {
+    const payload = await runCliJson<{data: {result: Row[]}}>(
+      ['mysql', 'query', 'SELECT id AS `limit` FROM metrics'],
+      configDir,
+    )
+
+    expect(payload.data.result).to.have.lengthOf(100)
+  })
+
   it('applies the default LIMIT to a semicolon-terminated SELECT', async () => {
     // The appended LIMIT has to land in front of the `;`. Behind it, MySQL
     // parses `LIMIT 100` as a second statement and rejects the query.
