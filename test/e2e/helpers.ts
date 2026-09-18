@@ -72,18 +72,61 @@ export async function removeConfigDir(dir: string): Promise<void> {
 }
 
 /**
- * Runs the built CLI (`bin/run.js`) as a real subprocess against the Docker
- * MySQL server. Non-zero exits are returned rather than thrown so tests can
- * assert on failure paths.
+ * Builds the subprocess invocation for the configured host CLI.
+ *
+ * By default the built standalone CLI (`bin/run.js`) runs with `MQ_CONFIG_DIR`
+ * (oclif scopes that env var by bin name). When `E2E_HOST_CLI=sdkck`, the same
+ * arguments go to the `sdkck` binary instead — plugin commands are
+ * topic-prefixed (`sdkck mysql tables`), so the argv is host-agnostic — and
+ * oclif's bin-scoped `SDKCK_*` dirs are redirected: config to the same
+ * throwaway `mysql-config.json` dir the standalone leg uses, data/cache into
+ * the throwaway sdkck home (`E2E_SDKCK_HOME`) that the scripts installed the
+ * plugin into.
  *
  * @param args Command line arguments, e.g. ['mysql', 'tables'].
- * @param configDir Value for MQ_CONFIG_DIR, from createConfigDir().
+ * @param configDir The dir holding mysql-config.json, from createConfigDir().
+ * @returns The executable, its argv, and env overrides to layer over process.env.
+ */
+function hostInvocation(
+  args: string[],
+  configDir: string,
+): {argv: string[]; command: string; env: Record<string, string>} {
+  if (process.env.E2E_HOST_CLI === 'sdkck') {
+    const home = process.env.E2E_SDKCK_HOME
+    if (!home) {
+      throw new Error('E2E_HOST_CLI=sdkck requires E2E_SDKCK_HOME — set by scripts/e2e.sh or the CI workflow')
+    }
+
+    return {
+      argv: args,
+      command: 'sdkck',
+      env: {
+        SDKCK_CACHE_DIR: path.join(home, 'cache'),
+        SDKCK_CONFIG_DIR: configDir,
+        SDKCK_DATA_DIR: path.join(home, 'data'),
+      },
+    }
+  }
+
+  return {argv: [CLI, ...args], command: process.execPath, env: {MQ_CONFIG_DIR: configDir}}
+}
+
+/**
+ * Runs the host CLI as a real subprocess against the Docker MySQL server. The
+ * host is the built standalone CLI unless `E2E_HOST_CLI=sdkck` (see
+ * hostInvocation()). Non-zero exits are returned rather than thrown so tests
+ * can assert on failure paths.
+ *
+ * @param args Command line arguments, e.g. ['mysql', 'tables'].
+ * @param configDir Value for MQ_CONFIG_DIR / SDKCK_CONFIG_DIR, from
+ *   createConfigDir().
  * @returns The exit code and captured stdout/stderr.
  */
 export async function runCli(args: string[], configDir: string): Promise<CliResult> {
+  const {argv, command, env} = hostInvocation(args, configDir)
   try {
-    const {stderr, stdout} = await execFileAsync(process.execPath, [CLI, ...args], {
-      env: {...process.env, FORCE_COLOR: '0', MQ_CONFIG_DIR: configDir, NO_COLOR: '1'},
+    const {stderr, stdout} = await execFileAsync(command, argv, {
+      env: {...process.env, FORCE_COLOR: '0', NO_COLOR: '1', ...env},
       maxBuffer: 32 * 1024 * 1024,
     })
     return {code: 0, stderr, stdout}

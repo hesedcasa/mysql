@@ -175,10 +175,7 @@ await cmd.run()
 
 **MySQL layer tests** (`test/mysql/mysql-utils.test.ts`) — stub `mysql.createPool` directly.
 
-**End-to-end tests** (`test/e2e/*.e2e.test.ts`) — no mocks. `docker/Dockerfile` provisions a
-MySQL 8.4 server seeded from `docker/initdb/`, and `test/e2e/helpers.ts` runs the built
-`bin/run.js` as a subprocess with `MQ_CONFIG_DIR` pointed at a temp config dir holding
-`default`, `alt` and `broken` profiles:
+**End-to-end tests** (`test/e2e/*.e2e.test.ts`) — no mocks. `docker/Dockerfile` provisions a MySQL 8.4 server seeded from `docker/initdb/`, and `test/e2e/helpers.ts` runs the built `bin/run.js` as a subprocess with `MQ_CONFIG_DIR` pointed at a temp config dir holding `default`, `alt`, `broken` and `empty` profiles. `npm run test:e2e` then reruns the same suite through the sdkck host CLI (pinned in devDependencies, integrity-locked via the lockfile) with the current build packed and installed as its `@hesed/mysql` plugin — the host switch (`E2E_HOST_CLI=sdkck` + `E2E_SDKCK_HOME`, set by `scripts/e2e.sh` and the CI workflow) lives in `test/e2e/helpers.ts`; the plugin must be installed before any `sdkck mysql` call, or sdkck auto-installs the published release, and the tarball must be a `file:` URL (bare paths read as GitHub org/repo):
 
 ```typescript
 const configDir = await createConfigDir()
