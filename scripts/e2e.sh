@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Runs the end-to-end suite against a disposable MySQL server in Docker —
-# twice: once through the built standalone CLI, then again through the latest
-# sdkck host CLI with this build packed and installed as its @hesed/mysql
-# plugin.
+# twice: once through the built standalone CLI, then again through the sdkck
+# host CLI with this build packed and installed as its @hesed/mysql plugin.
 #
 #   npm run test:e2e            # up -> build -> test -> down
 #   npm run test:e2e -- --keep  # leave the container running afterwards
@@ -87,12 +86,13 @@ echo "==> Running end-to-end tests"
 run_mocha
 
 # Second leg: the same suite through the sdkck host CLI, with this build
-# installed as its @hesed/mysql plugin.
-echo "==> Downloading the latest sdkck"
-# --no-save resolves "latest" from the registry on every run without touching
-# package.json; the binary comes from node_modules/.bin.
-npm install --silent --no-save sdkck
+# installed as its @hesed/mysql plugin. sdkck is pinned in devDependencies and
+# integrity-locked via package-lock.json — Dependabot keeps the pin fresh.
 export PATH="$PWD/node_modules/.bin:$PATH"
+if ! command -v sdkck >/dev/null 2>&1; then
+  echo "error: sdkck not found — run npm install first" >&2
+  exit 1
+fi
 
 # A throwaway sdkck home keeps the plugin install, its config and its caches
 # out of the developer's real sdkck setup; the test side finds it via
@@ -106,7 +106,13 @@ echo "==> Packing the current build and installing it as an sdkck plugin"
 # the real install artifact, not just the working tree. Packing straight into
 # the throwaway home keeps the tarball out of the repo root; the EXIT trap
 # removes it with the rest of the home.
+#
+# `oclif readme` inside prepack also rewrites the tracked README.md with the
+# current machine's usage string, so back it up and restore it after packing —
+# an e2e run must never dirty the worktree or clobber uncommitted README edits.
+cp README.md "$SDKCK_HOME/README.md.bak"
 TGZ="$(npm pack --pack-destination "$SDKCK_HOME" | tail -n 1)"
+mv "$SDKCK_HOME/README.md.bak" README.md
 
 # Installing here — before any `sdkck mysql` invocation — stops sdkck's
 # first-use auto-installer from pulling the published @hesed/mysql release over
