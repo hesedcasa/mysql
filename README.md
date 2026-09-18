@@ -26,7 +26,7 @@ $ npm install -g @hesed/mysql
 $ mq COMMAND
 running command...
 $ mq (--version)
-@hesed/mysql/0.6.2 linux-x64 node-v22.23.2
+@hesed/mysql/0.6.2 darwin-arm64 node-v24.18.0
 $ mq --help [COMMAND]
 USAGE
   $ mq COMMAND
