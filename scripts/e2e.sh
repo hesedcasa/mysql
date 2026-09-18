@@ -45,6 +45,14 @@ export MQ_E2E_PROJECT="${MQ_E2E_PROJECT:-mq-e2e-$$}"
 export MQ_E2E_PORT="${MQ_E2E_PORT:-0}"
 
 cleanup() {
+  # Packing failure path: prepack may have rewritten README.md after the
+  # backup was taken but before the inline restore ran. Put it back before
+  # the home (and the backup with it) is deleted. After a successful pack
+  # the backup is already gone, so this is a no-op.
+  if [ -n "${SDKCK_HOME:-}" ] && [ -f "$SDKCK_HOME/README.md.bak" ]; then
+    mv "$SDKCK_HOME/README.md.bak" README.md
+  fi
+
   if [ -n "${SDKCK_HOME:-}" ]; then
     rm -rf "$SDKCK_HOME"
   fi
