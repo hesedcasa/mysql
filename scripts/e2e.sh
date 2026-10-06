@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs the end-to-end suite against a disposable MySQL server in Docker —
-# twice: once through the built standalone CLI, then again through the sdkck
-# host CLI with this build packed and installed as its @hesed/mysql plugin.
+# twice: once through the built standalone CLI, then again through the latest
+# sdkck host CLI with this build packed and installed as its @hesed/mysql
+# plugin.
 #
 #   npm run test:e2e            # up -> build -> test -> down
 #   npm run test:e2e -- --keep  # leave the container running afterwards
@@ -44,17 +45,20 @@ fi
 export MQ_E2E_PROJECT="${MQ_E2E_PROJECT:-mq-e2e-$$}"
 export MQ_E2E_PORT="${MQ_E2E_PORT:-0}"
 
-cleanup() {
-  # Packing failure path: prepack may have rewritten README.md after the
-  # backup was taken but before the inline restore ran. Put it back before
-  # the home (and the backup with it) is deleted. After a successful pack
-  # the backup is already gone, so this is a no-op.
-  if [ -n "${SDKCK_HOME:-}" ] && [ -f "$SDKCK_HOME/README.md.bak" ]; then
-    mv "$SDKCK_HOME/README.md.bak" README.md
-  fi
+# The throwaway sdkck home this script creates, if it got that far. Deliberately
+# NOT named SDKCK_HOME: an inherited SDKCK_HOME could point at the developer's
+# real sdkck setup, and the EXIT trap must never rm -rf that. This variable only
+# ever holds a path this script itself mktemp'd.
+SDKCK_E2E_HOME=""
 
-  if [ -n "${SDKCK_HOME:-}" ]; then
-    rm -rf "$SDKCK_HOME"
+cleanup() {
+  if [ -n "$SDKCK_E2E_HOME" ]; then
+    # `npm pack` can fail after `prepack` has already rewritten README.md, so
+    # the restore lives here rather than only after the pack.
+    if [ -f "$SDKCK_E2E_HOME/README.md.orig" ]; then
+      cp "$SDKCK_E2E_HOME/README.md.orig" README.md
+    fi
+    rm -rf "$SDKCK_E2E_HOME"
   fi
 
   if [ "$KEEP" -eq 0 ]; then
@@ -76,6 +80,15 @@ run_mocha() {
   npm run --silent e2e:mocha -- ${MOCHA_ARGS[@]+"${MOCHA_ARGS[@]}"}
 }
 
+# Records the first failing leg's status. A later leg failing with a different
+# status must not overwrite an earlier failure: the script's contract is to
+# exit with the first failure it saw.
+EXIT_STATUS=0
+record_failure() {
+  local leg_status=$?
+  [ "$EXIT_STATUS" -ne 0 ] || EXIT_STATUS=$leg_status
+}
+
 echo "==> Starting MySQL (project $MQ_E2E_PROJECT)"
 docker compose -f "$COMPOSE_FILE" up -d --build --wait
 
@@ -91,22 +104,38 @@ echo "==> Building the CLI"
 npm run build
 
 echo "==> Running end-to-end tests"
-run_mocha
+# Both legs always run: a standalone-leg failure says nothing about the packed
+# plugin, and vice versa. The `|| record_failure` form keeps `set -e` from
+# aborting so the sdkck leg still executes; the first failure becomes the exit
+# code.
+run_mocha || record_failure
 
 # Second leg: the same suite through the sdkck host CLI, with this build
-# installed as its @hesed/mysql plugin. sdkck is pinned in devDependencies and
-# integrity-locked via package-lock.json — Dependabot keeps the pin fresh.
+# installed as its @hesed/mysql plugin.
+echo "==> Downloading the latest sdkck"
+# --no-save resolves "latest" from the registry on every run without touching
+# package.json; the binary comes from node_modules/.bin.
+npm install --silent --no-save sdkck
 export PATH="$PWD/node_modules/.bin:$PATH"
-if ! command -v sdkck >/dev/null 2>&1; then
-  echo "error: sdkck not found — run npm install first" >&2
-  exit 1
-fi
 
 # A throwaway sdkck home keeps the plugin install, its config and its caches
 # out of the developer's real sdkck setup; the test side finds it via
 # E2E_SDKCK_HOME.
-SDKCK_HOME="$(mktemp -d)"
-export E2E_SDKCK_HOME="$SDKCK_HOME"
+SDKCK_E2E_HOME="$(mktemp -d)"
+export E2E_SDKCK_HOME="$SDKCK_E2E_HOME"
+SDKCK_DIRS=(
+  SDKCK_CACHE_DIR="$SDKCK_E2E_HOME/cache"
+  SDKCK_CONFIG_DIR="$SDKCK_E2E_HOME/config"
+  SDKCK_DATA_DIR="$SDKCK_E2E_HOME/data"
+)
+
+# A fresh home cannot hold the plugin yet; if it does, the leg would test
+# whatever is there rather than this build. `plugins inspect` is a host
+# command, so the probe cannot itself trigger sdkck's first-use install.
+if env "${SDKCK_DIRS[@]}" sdkck plugins inspect @hesed/mysql --json >/dev/null 2>&1; then
+  echo "error: @hesed/mysql is already installed in the throwaway sdkck home" >&2
+  exit 1
+fi
 
 echo "==> Packing the current build and installing it as an sdkck plugin"
 # npm pack runs `prepack`, regenerating oclif.manifest.json and the README —
@@ -114,22 +143,31 @@ echo "==> Packing the current build and installing it as an sdkck plugin"
 # the real install artifact, not just the working tree. Packing straight into
 # the throwaway home keeps the tarball out of the repo root; the EXIT trap
 # removes it with the rest of the home.
-#
-# `oclif readme` inside prepack also rewrites the tracked README.md with the
-# current machine's usage string, so back it up and restore it after packing —
-# an e2e run must never dirty the worktree or clobber uncommitted README edits.
-cp README.md "$SDKCK_HOME/README.md.bak"
-TGZ="$(npm pack --pack-destination "$SDKCK_HOME" | tail -n 1)"
-mv "$SDKCK_HOME/README.md.bak" README.md
+# `oclif readme` stamps the local platform into README.md's usage block, so
+# the committed README is backed up here and put back by the EXIT trap rather
+# than left modified.
+cp README.md "$SDKCK_E2E_HOME/README.md.orig"
+TGZ="$(npm pack --pack-destination "$SDKCK_E2E_HOME" | tail -n 1)"
+cp "$SDKCK_E2E_HOME/README.md.orig" README.md
 
 # Installing here — before any `sdkck mysql` invocation — stops sdkck's
-# first-use auto-installer from pulling the published @hesed/mysql release over
-# the build under test. The tarball must be passed as a `file:` URL: sdkck
-# resolves any bare path containing a slash as a GitHub org/repo.
-SDKCK_CACHE_DIR="$SDKCK_HOME/cache" \
-SDKCK_CONFIG_DIR="$SDKCK_HOME/config" \
-SDKCK_DATA_DIR="$SDKCK_HOME/data" \
-  sdkck plugins install "file:$SDKCK_HOME/$TGZ"
+# first-use auto-installer from pulling the published @hesed/mysql release
+# over the build under test. The tarball must be passed as a `file:` URL:
+# sdkck resolves any bare path containing a slash as a GitHub org/repo.
+env "${SDKCK_DIRS[@]}" sdkck plugins install "file:$SDKCK_E2E_HOME/$TGZ"
+
+# Prove dispatch resolves to the tarball this run packed, not a published
+# release the auto-installer could have fetched: the install record sdkck
+# writes under the data dir must carry our file: URL. The record is read from
+# disk rather than via `sdkck plugins inspect`, which has been observed to die
+# on an unsettled top-level await right after loading a freshly installed
+# plugin.
+grep -Fq "\"file:$SDKCK_E2E_HOME/$TGZ\"" "$SDKCK_E2E_HOME/data/package.json" || {
+  echo "error: sdkck did not register the packed tarball as @hesed/mysql" >&2
+  exit 1
+}
 
 echo "==> Running end-to-end tests via sdkck"
-E2E_HOST_CLI=sdkck run_mocha
+E2E_HOST_CLI=sdkck run_mocha || record_failure
+
+exit "$EXIT_STATUS"
