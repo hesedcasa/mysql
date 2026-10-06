@@ -14,12 +14,11 @@ jobs:
     name: End-to-end tests against MySQL in Docker
     # Docker with the Compose plugin is preinstalled on the Ubuntu runners only.
     runs-on: ubuntu-latest
-    # Two legs (standalone CLI, then the same suite via sdkck) at up to 1
-    # minute per test.
-    timeout-minutes: 45
+    # Two legs: the standalone CLI, then the same suite via the sdkck host CLI.
+    timeout-minutes: 50
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 2
           # Nothing here pushes; don't leave the token in .git/config for the
@@ -27,7 +26,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           cache: npm
           node-version-file: '.nvmrc'
@@ -43,11 +42,14 @@ jobs:
       - name: Build the CLI
         run: npm run build
 
+      # Step-level timeouts, not just the job's: a hung standalone run fails
+      # only its own step, so the sdkck leg (which runs unless cancelled) still
+      # gets its turn. The job-level timeout stays as the outer backstop.
       - name: Run end-to-end tests
+        timeout-minutes: 20
         run: npm run e2e:mocha
 
-      # Second leg: the same suite through the sdkck host CLI (pinned in
-      # devDependencies, so `npm ci` above put it in node_modules) with this
+      # Second leg: the same suite through the latest sdkck host CLI with this
       # build packed and installed as its @hesed/mysql plugin — covering the
       # `prepack` artifacts (oclif.manifest.json, README) and plugin dispatch
       # under a host. The plugin is installed before any `sdkck mysql` call so
@@ -55,20 +57,42 @@ jobs:
       # over this build. The throwaway sdkck home (mktemp -d) keeps the
       # install, config and caches out of the runner's real sdkck setup; the
       # test side finds it via E2E_SDKCK_HOME.
-      - name: Pack the build and install it as an sdkck plugin
+      - name: Install the latest sdkck and the packed plugin
+        id: sdkck
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
         run: |
+          npm install --no-save sdkck
           home="$(mktemp -d)"
           echo "E2E_SDKCK_HOME=$home" >> "$GITHUB_ENV"
+          export SDKCK_CACHE_DIR="$home/cache" SDKCK_CONFIG_DIR="$home/config" SDKCK_DATA_DIR="$home/data"
+          # A fresh home cannot hold the plugin yet; if it does, the leg would
+          # test whatever is there rather than this build. `plugins inspect` is
+          # a host command, so the probe cannot itself trigger sdkck's
+          # first-use install.
+          if ./node_modules/.bin/sdkck plugins inspect @hesed/mysql --json >/dev/null 2>&1; then
+            echo "error: @hesed/mysql is already installed in the throwaway sdkck home" >&2
+            exit 1
+          fi
           # A `file:` URL is required: sdkck resolves any bare path containing
           # a slash as a GitHub org/repo. Packing into the throwaway home
           # keeps the tarball out of the workspace.
           tgz="$(npm pack --pack-destination "$home" | tail -n 1)"
-          SDKCK_CACHE_DIR="$home/cache" \
-          SDKCK_CONFIG_DIR="$home/config" \
-          SDKCK_DATA_DIR="$home/data" \
-            ./node_modules/.bin/sdkck plugins install "file:$home/$tgz"
+          ./node_modules/.bin/sdkck plugins install "file:$home/$tgz"
+          # Prove dispatch resolves to the tarball this run packed, not a
+          # published release the auto-installer could have fetched: the
+          # install record sdkck writes under the data dir must carry our
+          # file: URL. The record is read from disk rather than via
+          # `sdkck plugins inspect`, which has been observed to die on an
+          # unsettled top-level await right after loading a freshly
+          # installed plugin.
+          grep -Fq "\"file:$home/$tgz\"" "$SDKCK_DATA_DIR/package.json"
 
+      # Only after a verified install: otherwise sdkck's first-use installer
+      # would fetch the published release and the leg would test that instead.
       - name: Run end-to-end tests via sdkck
+        if: ${{ !cancelled() && steps.sdkck.outcome == 'success' }}
+        timeout-minutes: 20
         run: npm run e2e:mocha
         env:
           E2E_HOST_CLI: sdkck
